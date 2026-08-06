@@ -21,6 +21,8 @@ import (
         "github.com/ChickenRamen500/tunnelcraft/core/internal/engine"
         protos "github.com/ChickenRamen500/tunnelcraft/core/internal/proto"
 		"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/ChickenRamen500/tunnelcraft/core/internal/subscription"
 )
 
 // Server wraps the gRPC server and all service implementations.
@@ -293,8 +295,20 @@ func (sv *serverService) GetServer(ctx context.Context, req *protos.GetServerReq
 
 func (sv *serverService) CreateServer(ctx context.Context, req *protos.CreateServerRequest) (*protos.Server, error) {
         _ = ctx
-        // TODO: implement server creation
-        return req.Server, nil
+        if req.Server == nil {
+                return nil, fmt.Errorf("server is required")
+        }
+        entry := protoToServerEntry(req.Server)
+        if entry.ID == "" {
+                entry.ID = engine.GenerateID()
+        }
+        err := sv.s.cfg.Update(func(c *config.Config) {
+                c.Servers = append(c.Servers, entry)
+        })
+        if err != nil {
+                return nil, fmt.Errorf("failed to save server: %w", err)
+        }
+        return serverEntryToProto(entry), nil
 }
 
 func (sv *serverService) UpdateServer(ctx context.Context, req *protos.UpdateServerRequest) (*protos.Server, error) {
@@ -317,8 +331,44 @@ func (sv *serverService) TestServers(req *protos.TestServersRequest, stream prot
 
 func (sv *serverService) ImportServers(ctx context.Context, req *protos.ImportServersRequest) (*protos.ImportServersResponse, error) {
         _ = ctx
-        // TODO: implement server import (Step 4)
-        return &protos.ImportServersResponse{}, nil
+        if req.Content == "" {
+                return &protos.ImportServersResponse{}, nil
+        }
+        servers, parseErrors := subscription.Parse([]byte(req.Content))
+        var errStrings []string
+        for _, pe := range parseErrors {
+                errStrings = append(errStrings, pe.Error())
+        }
+        var importedIDs []string
+        var entries []config.ServerEntry
+        for _, sc := range servers {
+                entry := serverConfigToEntry(sc)
+                if entry.ID == "" {
+                        entry.ID = engine.GenerateID()
+                }
+                if req.SubscriptionId != "" {
+                        entry.SubscriptionID = req.SubscriptionId
+                }
+                if req.GroupName != "" {
+                        entry.Tags = append(entry.Tags, req.GroupName)
+                }
+                entries = append(entries, entry)
+                importedIDs = append(importedIDs, entry.ID)
+        }
+        if len(entries) > 0 {
+                err := sv.s.cfg.Update(func(c *config.Config) {
+                        c.Servers = append(c.Servers, entries...)
+                })
+                if err != nil {
+                        return nil, fmt.Errorf("failed to save imported servers: %w", err)
+                }
+        }
+        return &protos.ImportServersResponse{
+                ImportedServerIds: importedIDs,
+                TotalParsed:       int32(len(servers) + len(parseErrors)),
+                TotalImported:     int32(len(importedIDs)),
+                Errors:            errStrings,
+        }, nil
 }
 
 func (sv *serverService) ExportServer(ctx context.Context, req *protos.ExportServerRequest) (*protos.ExportServerResponse, error) {
@@ -616,30 +666,55 @@ func durationToProto(d time.Duration) *protos.Duration {
 
 func serverEntryToProto(s config.ServerEntry) *protos.Server {
         pb := &protos.Server{
-                Id:          s.ID,
-                Name:        s.Name,
-                Host:        s.Host,
-                Port:        s.Port,
-                Favorite:    s.Favorite,
-                SortOrder:   s.SortOrder,
-                Tags:        s.Tags,
-                SubscriptionId: s.SubscriptionID,
+                Id: s.ID, Name: s.Name, Host: s.Host, Port: s.Port,
+                Favorite: s.Favorite, SortOrder: s.SortOrder,
+                Tags: s.Tags, SubscriptionId: s.SubscriptionID,
         }
-
-        // Map protocol string to enum
         switch s.Protocol {
-        case "vless":
-                pb.Protocol = protos.Protocol_PROTOCOL_VLESS
-        case "vmess":
-                pb.Protocol = protos.Protocol_PROTOCOL_VMESS
+        case "vless", "vmess":
+                if s.Protocol == "vless" { pb.Protocol = protos.Protocol_PROTOCOL_VLESS } else { pb.Protocol = protos.Protocol_PROTOCOL_VMESS }
+                if s.XrayConfig != nil {
+                        pb.Xray = &protos.XrayConfig{
+                                Uuid: s.XrayConfig.UUID, Flow: s.XrayConfig.Flow,
+                                Sni: s.XrayConfig.SNI, Fingerprint: s.XrayConfig.Fingerprint,
+                                Alpn: s.XrayConfig.ALPN, PublicKey: s.XrayConfig.PublicKey,
+                                ShortId: s.XrayConfig.ShortID, KcpSeed: s.XrayConfig.KCPSeed,
+                                XhttpPath: s.XrayConfig.XHTTPPath, XhttpMode: s.XrayConfig.XHTTPMode,
+                                WsPath: s.XrayConfig.WSPath, GrpcService: s.XrayConfig.GRPCService,
+                                AllowInsecure: s.XrayConfig.AllowInsecure,
+                        }
+                }
         case "wireguard":
                 pb.Protocol = protos.Protocol_PROTOCOL_WIREGUARD
+                if s.WGConfig != nil {
+                        pb.Wireguard = &protos.WireGuardConfig{
+                                PrivateKey: s.WGConfig.PrivateKey, PublicKey: s.WGConfig.PublicKey,
+                                PresharedKey: s.WGConfig.PresharedKey, LocalAddress: s.WGConfig.LocalAddress,
+                                DnsServers: s.WGConfig.DNSServers, Mtu: s.WGConfig.MTU,
+                                PersistentKeepalive: s.WGConfig.PersistentKeepalive, AllowedIps: s.WGConfig.AllowedIPs,
+                        }
+                }
         case "hysteria":
                 pb.Protocol = protos.Protocol_PROTOCOL_HYSTERIA
+                if s.HysteriaConfig != nil {
+                        pb.Hysteria = &protos.HysteriaConfig{
+                                AuthPassword: s.HysteriaConfig.AuthPassword, Sni: s.HysteriaConfig.SNI,
+                                Insecure: s.HysteriaConfig.Insecure, Alpn: s.HysteriaConfig.ALPN,
+                                ObfsPassword: s.HysteriaConfig.ObfsPassword,
+                                BandwidthUp: s.HysteriaConfig.BandwidthUp, BandwidthDown: s.HysteriaConfig.BandwidthDown,
+                                FastOpen: s.HysteriaConfig.FastOpen,
+                        }
+                }
         case "amneziawg":
                 pb.Protocol = protos.Protocol_PROTOCOL_AMNEZIAWG
+                if s.AmneziaConfig != nil {
+                        pb.Amneziawg = &protos.AmneziaWGConfig{
+                                PrivateKey: s.AmneziaConfig.PrivateKey, PublicKey: s.AmneziaConfig.PublicKey,
+                                PresharedKey: s.AmneziaConfig.PresharedKey, LocalAddress: s.AmneziaConfig.LocalAddress,
+                                DnsServers: s.AmneziaConfig.DNSServers, Mtu: s.AmneziaConfig.MTU,
+                        }
+                }
         }
-
         return pb
 }
 
@@ -711,6 +786,103 @@ func settingsToProto(cfg *config.Config) *protos.Settings {
                 ActiveServerId:      cfg.Tunnel.ActiveServerID,
                 Routing:             routingConfigToProto(&cfg.Routing),
         }
+}
+
+
+// protoToServerEntry converts a proto Server message to a config ServerEntry.
+func protoToServerEntry(pb *protos.Server) config.ServerEntry {
+        entry := config.ServerEntry{
+                ID: pb.Id, Name: pb.Name, Host: pb.Host, Port: pb.Port,
+                Favorite: pb.Favorite, SortOrder: pb.SortOrder,
+                Tags: pb.Tags, SubscriptionID: pb.SubscriptionId,
+        }
+        switch pb.Protocol {
+        case protos.Protocol_PROTOCOL_VLESS: entry.Protocol = "vless"
+        case protos.Protocol_PROTOCOL_VMESS: entry.Protocol = "vmess"
+        case protos.Protocol_PROTOCOL_WIREGUARD: entry.Protocol = "wireguard"
+        case protos.Protocol_PROTOCOL_HYSTERIA: entry.Protocol = "hysteria"
+        case protos.Protocol_PROTOCOL_AMNEZIAWG: entry.Protocol = "amneziawg"
+        }
+        if pb.Xray != nil {
+                entry.XrayConfig = &config.XrayConfigEntry{
+                        UUID: pb.Xray.Uuid, Flow: pb.Xray.Flow,
+                        Security: pb.Xray.Security.String(), Transport: pb.Xray.Transport.String(),
+                        SNI: pb.Xray.Sni, Fingerprint: pb.Xray.Fingerprint,
+                        ALPN: pb.Xray.Alpn, PublicKey: pb.Xray.PublicKey,
+                        ShortID: pb.Xray.ShortId, KCPSeed: pb.Xray.KcpSeed,
+                        XHTTPPath: pb.Xray.XhttpPath, XHTTPMode: pb.Xray.XhttpMode,
+                        WSPath: pb.Xray.WsPath, GRPCService: pb.Xray.GrpcService,
+                        AllowInsecure: pb.Xray.AllowInsecure,
+                }
+        }
+        if pb.Wireguard != nil {
+                entry.WGConfig = &config.WGConfigEntry{
+                        PrivateKey: pb.Wireguard.PrivateKey, PublicKey: pb.Wireguard.PublicKey,
+                        PresharedKey: pb.Wireguard.PresharedKey, LocalAddress: pb.Wireguard.LocalAddress,
+                        DNSServers: pb.Wireguard.DnsServers, MTU: pb.Wireguard.Mtu,
+                        PersistentKeepalive: pb.Wireguard.PersistentKeepalive, AllowedIPs: pb.Wireguard.AllowedIps,
+                }
+        }
+        if pb.Hysteria != nil {
+                entry.HysteriaConfig = &config.HysteriaConfigEntry{
+                        AuthPassword: pb.Hysteria.AuthPassword, SNI: pb.Hysteria.Sni,
+                        Insecure: pb.Hysteria.Insecure, ALPN: pb.Hysteria.Alpn,
+                        ObfsPassword: pb.Hysteria.ObfsPassword,
+                        BandwidthUp: pb.Hysteria.BandwidthUp, BandwidthDown: pb.Hysteria.BandwidthDown,
+                        FastOpen: pb.Hysteria.FastOpen,
+                }
+        }
+        if pb.Amneziawg != nil {
+                entry.AmneziaConfig = &config.AmneziaConfigEntry{
+                        PrivateKey: pb.Amneziawg.PrivateKey, PublicKey: pb.Amneziawg.PublicKey,
+                        PresharedKey: pb.Amneziawg.PresharedKey, LocalAddress: pb.Amneziawg.LocalAddress,
+                        DNSServers: pb.Amneziawg.DnsServers, MTU: pb.Amneziawg.Mtu,
+                }
+        }
+        return entry
+}
+
+// serverConfigToEntry converts an engine ServerConfig to a config ServerEntry.
+func serverConfigToEntry(sc engine.ServerConfig) config.ServerEntry {
+        entry := config.ServerEntry{
+                ID: sc.ID, Name: sc.Name, Host: sc.Host, Port: sc.Port,
+                Protocol: string(sc.Protocol), Tags: sc.Tags,
+                Favorite: sc.Favorite, SortOrder: sc.SortOrder, SubscriptionID: sc.SubscriptionID,
+        }
+        switch sc.Protocol {
+        case engine.ProtocolVLESS, engine.ProtocolVMESS:
+                entry.XrayConfig = &config.XrayConfigEntry{
+                        UUID: sc.UUID, Flow: sc.Flow, Security: sc.Security,
+                        Transport: sc.Transport, SNI: sc.SNI, Fingerprint: sc.Fingerprint,
+                        ALPN: sc.ALPN, PublicKey: sc.PublicKey, ShortID: sc.ShortID,
+                        KCPSeed: sc.KCPSeed, XHTTPPath: sc.XHTTPPath, XHTTPMode: sc.XHTTPMode,
+                        WSPath: sc.WSPath, GRPCService: sc.GRPCService, AllowInsecure: sc.AllowInsecure,
+                }
+        case engine.ProtocolWireGuard:
+                entry.WGConfig = &config.WGConfigEntry{
+                        PrivateKey: sc.WGPrivateKey, PublicKey: sc.WGPublicKey,
+                        PresharedKey: sc.WGPresharedKey, LocalAddress: sc.WGLocalAddress,
+                        DNSServers: sc.WGDNSServers, AllowedIPs: sc.WGAllowedIPs,
+                }
+        case engine.ProtocolHysteria:
+                entry.HysteriaConfig = &config.HysteriaConfigEntry{
+                        AuthPassword: sc.HysteriaAuth, SNI: sc.HysteriaSNI,
+                        Insecure: sc.HysteriaInsecure, ALPN: sc.HysteriaALPN,
+                        ObfsPassword: sc.HysteriaObfs,
+                        BandwidthUp: sc.HysteriaBwUp, BandwidthDown: sc.HysteriaBwDown,
+                        FastOpen: sc.HysteriaFastOpen,
+                }
+        case engine.ProtocolAmneziaWG:
+                entry.AmneziaConfig = &config.AmneziaConfigEntry{
+                        PrivateKey: sc.AmneziaPrivateKey, PublicKey: sc.AmneziaPublicKey,
+                        PresharedKey: sc.AmneziaPresharedKey, LocalAddress: sc.AmneziaLocalAddr,
+                        DNSServers: sc.AmneziaDNS,
+                        Jc: sc.AmneziaJc, Jmin: sc.AmneziaJmin, Jmax: sc.AmneziaJmax,
+                        S1: sc.AmneziaS1, S2: sc.AmneziaS2,
+                        H1: sc.AmneziaH1, H2: sc.AmneziaH2, H3: sc.AmneziaH3, H4: sc.AmneziaH4,
+                }
+        }
+        return entry
 }
 
 // NewGRPCClient creates a gRPC client connection for use by Tauri.
