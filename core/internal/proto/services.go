@@ -299,7 +299,93 @@ func _ServerService_ExportServer_Handler(srv interface{}, ctx context.Context, d
 }
 
 
-func NewServerServiceClient(cc grpc.ClientConnInterface) ServerServiceClient { return nil }
+type serverServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewServerServiceClient(cc grpc.ClientConnInterface) ServerServiceClient {
+	return &serverServiceClient{cc}
+}
+
+func (c *serverServiceClient) ListServers(ctx context.Context, in *ListServersRequest, opts ...grpc.CallOption) (*ListServersResponse, error) {
+	out := new(ListServersResponse)
+	err := c.cc.Invoke(ctx, "/tunnelcraft.v1.ServerService/ListServers", in, out, opts...)
+	return out, err
+}
+
+func (c *serverServiceClient) GetServer(ctx context.Context, in *GetServerRequest, opts ...grpc.CallOption) (*Server, error) {
+	out := new(Server)
+	err := c.cc.Invoke(ctx, "/tunnelcraft.v1.ServerService/GetServer", in, out, opts...)
+	return out, err
+}
+
+func (c *serverServiceClient) CreateServer(ctx context.Context, in *CreateServerRequest, opts ...grpc.CallOption) (*Server, error) {
+	out := new(Server)
+	err := c.cc.Invoke(ctx, "/tunnelcraft.v1.ServerService/CreateServer", in, out, opts...)
+	return out, err
+}
+
+func (c *serverServiceClient) UpdateServer(ctx context.Context, in *UpdateServerRequest, opts ...grpc.CallOption) (*Server, error) {
+	out := new(Server)
+	err := c.cc.Invoke(ctx, "/tunnelcraft.v1.ServerService/UpdateServer", in, out, opts...)
+	return out, err
+}
+
+func (c *serverServiceClient) DeleteServer(ctx context.Context, in *DeleteServerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/tunnelcraft.v1.ServerService/DeleteServer", in, out, opts...)
+	return out, err
+}
+
+func (c *serverServiceClient) TestServers(ctx context.Context, in *TestServersRequest, opts ...grpc.CallOption) (ServerService_TestServersClient, error) {
+	stream, err := c.cc.NewStream(ctx, &ServerService_ServiceDesc.Streams[0], "/tunnelcraft.v1.ServerService/TestServers", opts...)
+	if err != nil { return nil, err }
+	x := &serverServiceTestServersClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil { return nil, err }
+	if err := x.ClientStream.CloseSend(); err != nil { return nil, err }
+	return x, nil
+}
+
+type serverServiceTestServersClient struct {
+	grpc.ClientStream
+}
+
+func (x *serverServiceTestServersClient) Recv() (*TestResult, error) {
+	m := new(TestResult)
+	if err := x.ClientStream.RecvMsg(m); err != nil { return nil, err }
+	return m, nil
+}
+
+func (c *serverServiceClient) ImportServers(ctx context.Context, in *ImportServersRequest, opts ...grpc.CallOption) (*ImportServersResponse, error) {
+	out := new(ImportServersResponse)
+	err := c.cc.Invoke(ctx, "/tunnelcraft.v1.ServerService/ImportServers", in, out, opts...)
+	return out, err
+}
+
+func (c *serverServiceClient) ExportServer(ctx context.Context, in *ExportServerRequest, opts ...grpc.CallOption) (*ExportServerResponse, error) {
+	out := new(ExportServerResponse)
+	err := c.cc.Invoke(ctx, "/tunnelcraft.v1.ServerService/ExportServer", in, out, opts...)
+	return out, err
+}
+
+func (c *serverServiceClient) PingServer(ctx context.Context, in *PingServerRequest, opts ...grpc.CallOption) (ServerService_PingServerClient, error) {
+	stream, err := c.cc.NewStream(ctx, &ServerService_ServiceDesc.Streams[1], "/tunnelcraft.v1.ServerService/PingServer", opts...)
+	if err != nil { return nil, err }
+	x := &serverServicePingServerClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil { return nil, err }
+	if err := x.ClientStream.CloseSend(); err != nil { return nil, err }
+	return x, nil
+}
+
+type serverServicePingServerClient struct {
+	grpc.ClientStream
+}
+
+func (x *serverServicePingServerClient) Recv() (*PingResult, error) {
+	m := new(PingResult)
+	if err := x.ClientStream.RecvMsg(m); err != nil { return nil, err }
+	return m, nil
+}
 
 // ============================================================================
 // SubscriptionService
