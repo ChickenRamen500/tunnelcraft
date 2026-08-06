@@ -206,8 +206,8 @@ type tunnelServiceWatchConnectionClient struct {
 	grpc.ClientStream
 }
 
-func (x *tunnelServiceWatchConnectionClient) Recv() (*ConnectionEvent, error) {
-	m := new(ConnectionEvent)
+func (x *tunnelServiceWatchConnectionClient) Recv() (*ConnectionStateEvent, error) {
+	m := new(ConnectionStateEvent)
 	if err := x.ClientStream.RecvMsg(m); err != nil { return nil, err }
 	return m, nil
 }
@@ -397,8 +397,8 @@ type serverServiceTestServersClient struct {
 	grpc.ClientStream
 }
 
-func (x *serverServiceTestServersClient) Recv() (*TestResult, error) {
-	m := new(TestResult)
+func (x *serverServiceTestServersClient) Recv() (*ServerTestResult, error) {
+	m := new(ServerTestResult)
 	if err := x.ClientStream.RecvMsg(m); err != nil { return nil, err }
 	return m, nil
 }
@@ -428,8 +428,8 @@ type serverServicePingServerClient struct {
 	grpc.ClientStream
 }
 
-func (x *serverServicePingServerClient) Recv() (*PingResult, error) {
-	m := new(PingResult)
+func (x *serverServicePingServerClient) Recv() (*LatencySample, error) {
+	m := new(LatencySample)
 	if err := x.ClientStream.RecvMsg(m); err != nil { return nil, err }
 	return m, nil
 }
