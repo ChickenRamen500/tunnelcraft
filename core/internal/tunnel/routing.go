@@ -35,8 +35,15 @@ func (r *RoutingManager) Setup(socksPort, httpPort uint32, server *engine.Server
 		return nil
 	}
 
+	// For WireGuard/AmneziaWG, they manage their own TUN interface
+	// We don't need to create a TUN adapter for them
+	switch server.Protocol {
+	case engine.ProtocolWireGuard, engine.ProtocolAmneziaWG:
+		log.Println("[routing] WireGuard/AmneziaWG: skipping TUN adapter creation (they manage their own)")
+		return nil
+	}
 
-	// Create TUN adapter
+	// For other protocols (xray, hysteria), create TUN adapter
 	adapter, err := r.wintun.CreateAdapter(TUNAdapterName, DefaultMTU)
 	if err != nil {
 		return fmt.Errorf("failed to create TUN adapter: %w", err)
@@ -44,16 +51,7 @@ func (r *RoutingManager) Setup(socksPort, httpPort uint32, server *engine.Server
 	log.Printf("[routing] TUN adapter '%s' created (MTU: %d)", adapter.Name(), adapter.MTU())
 
 	// For SOCKS/HTTP proxy mode (xray, hysteria), we configure the system proxy
-	// For TUN mode (wireguard, amnezia), we add system routes
-	switch server.Protocol {
-	case engine.ProtocolWireGuard, engine.ProtocolAmneziaWG:
-		// WG/AWG manage their own TUN, we just set up routing
-		return nil
-	default:
-		// For proxy-based protocols, we'd configure system proxy
-		// or use TUN with SOCKS forwarding
-		return r.setupProxyRouting(socksPort, httpPort)
-	}
+	return r.setupProxyRouting(socksPort, httpPort)
 }
 
 // Teardown removes all applied routes and destroys the TUN adapter.
