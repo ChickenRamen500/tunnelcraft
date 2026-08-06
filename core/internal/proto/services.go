@@ -167,8 +167,55 @@ func _TunnelService_Reconnect_Handler(srv interface{}, ctx context.Context, dec 
 }
 
 
+type tunnelServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
 func NewTunnelServiceClient(cc grpc.ClientConnInterface) TunnelServiceClient {
-	return nil // stub
+	return &tunnelServiceClient{cc}
+}
+
+func (c *tunnelServiceClient) Connect(ctx context.Context, in *ConnectRequest, opts ...grpc.CallOption) (*ConnectResponse, error) {
+	out := new(ConnectResponse)
+	err := c.cc.Invoke(ctx, "/tunnelcraft.v1.TunnelService/Connect", in, out, opts...)
+	return out, err
+}
+
+func (c *tunnelServiceClient) Disconnect(ctx context.Context, in *DisconnectRequest, opts ...grpc.CallOption) (*DisconnectResponse, error) {
+	out := new(DisconnectResponse)
+	err := c.cc.Invoke(ctx, "/tunnelcraft.v1.TunnelService/Disconnect", in, out, opts...)
+	return out, err
+}
+
+func (c *tunnelServiceClient) GetConnectionStatus(ctx context.Context, in *GetConnectionStatusRequest, opts ...grpc.CallOption) (*GetConnectionStatusResponse, error) {
+	out := new(GetConnectionStatusResponse)
+	err := c.cc.Invoke(ctx, "/tunnelcraft.v1.TunnelService/GetConnectionStatus", in, out, opts...)
+	return out, err
+}
+
+func (c *tunnelServiceClient) WatchConnection(ctx context.Context, in *WatchConnectionRequest, opts ...grpc.CallOption) (TunnelService_WatchConnectionClient, error) {
+	stream, err := c.cc.NewStream(ctx, &TunnelService_ServiceDesc.Streams[0], "/tunnelcraft.v1.TunnelService/WatchConnection", opts...)
+	if err != nil { return nil, err }
+	x := &tunnelServiceWatchConnectionClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil { return nil, err }
+	if err := x.ClientStream.CloseSend(); err != nil { return nil, err }
+	return x, nil
+}
+
+type tunnelServiceWatchConnectionClient struct {
+	grpc.ClientStream
+}
+
+func (x *tunnelServiceWatchConnectionClient) Recv() (*ConnectionEvent, error) {
+	m := new(ConnectionEvent)
+	if err := x.ClientStream.RecvMsg(m); err != nil { return nil, err }
+	return m, nil
+}
+
+func (c *tunnelServiceClient) Reconnect(ctx context.Context, in *ReconnectRequest, opts ...grpc.CallOption) (*ReconnectResponse, error) {
+	out := new(ReconnectResponse)
+	err := c.cc.Invoke(ctx, "/tunnelcraft.v1.TunnelService/Reconnect", in, out, opts...)
+	return out, err
 }
 
 // ============================================================================
