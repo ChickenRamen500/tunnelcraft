@@ -62,3 +62,5 @@ htmlcov/
 *.lz
 *.lzo
 ```
+wg-import.json
+bin/data/config.yaml
