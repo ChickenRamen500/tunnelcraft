@@ -35,7 +35,6 @@ func (r *RoutingManager) Setup(socksPort, httpPort uint32, server *engine.Server
 		return nil
 	}
 
-	cfg := r.wintun.configDir
 
 	// Create TUN adapter
 	adapter, err := r.wintun.CreateAdapter(TUNAdapterName, DefaultMTU)

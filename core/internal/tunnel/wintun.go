@@ -75,7 +75,7 @@ func (w *WintunDLL) Load() error {
 		return fmt.Errorf("failed to load %s: %w", dllPath, err)
 	}
 
-	w.handle = handle
+	w.handle = handle.Handle
 	w.loaded = true
 	return nil
 }

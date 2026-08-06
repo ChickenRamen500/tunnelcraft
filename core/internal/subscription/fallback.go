@@ -9,7 +9,6 @@ import (
         "time"
 
         "github.com/ChickenRamen500/tunnelcraft/core/internal/config"
-        "github.com/ChickenRamen500/tunnelcraft/core/internal/engine"
 )
 
 // FallbackMode indicates the current connection mode.

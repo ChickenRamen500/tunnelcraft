@@ -20,6 +20,7 @@ import (
         "github.com/ChickenRamen500/tunnelcraft/core/internal/config"
         "github.com/ChickenRamen500/tunnelcraft/core/internal/engine"
         protos "github.com/ChickenRamen500/tunnelcraft/core/internal/proto"
+		"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // Server wraps the gRPC server and all service implementations.
@@ -302,10 +303,10 @@ func (sv *serverService) UpdateServer(ctx context.Context, req *protos.UpdateSer
         return req.Server, nil
 }
 
-func (sv *serverService) DeleteServer(ctx context.Context, req *protos.DeleteServerRequest) (*protos.Empty, error) {
+func (sv *serverService) DeleteServer(ctx context.Context, req *protos.DeleteServerRequest) (*emptypb.Empty, error) {
         _ = ctx
         // TODO: implement server deletion
-        return &protos.Empty{}, nil
+        return &emptypb.Empty{}, nil
 }
 
 func (sv *serverService) TestServers(req *protos.TestServersRequest, stream protos.ServerService_TestServersServer) error {
@@ -377,10 +378,10 @@ func (ss *subscriptionService) UpdateSubscription(ctx context.Context, req *prot
         return req.Subscription, nil
 }
 
-func (ss *subscriptionService) DeleteSubscription(ctx context.Context, req *protos.DeleteSubscriptionRequest) (*protos.Empty, error) {
+func (ss *subscriptionService) DeleteSubscription(ctx context.Context, req *protos.DeleteSubscriptionRequest) (*emptypb.Empty, error) {
         _ = ctx
         // TODO: implement subscription deletion
-        return &protos.Empty{}, nil
+        return &emptypb.Empty{}, nil
 }
 
 func (ss *subscriptionService) RefreshSubscription(ctx context.Context, req *protos.RefreshSubscriptionRequest) (*protos.RefreshSubscriptionResponse, error) {
@@ -472,10 +473,10 @@ func (rs *routingService) UpdateRule(ctx context.Context, req *protos.UpdateRule
         return req.Rule, nil
 }
 
-func (rs *routingService) DeleteRule(ctx context.Context, req *protos.DeleteRuleRequest) (*protos.Empty, error) {
+func (rs *routingService) DeleteRule(ctx context.Context, req *protos.DeleteRuleRequest) (*emptypb.Empty, error) {
         _ = ctx
         // TODO: implement rule deletion
-        return &protos.Empty{}, nil
+        return &emptypb.Empty{}, nil
 }
 
 func (rs *routingService) ReorderRules(ctx context.Context, req *protos.ReorderRulesRequest) (*protos.ReorderRulesResponse, error) {
@@ -718,13 +719,5 @@ func NewGRPCClient(addr string) (protos.TunnelServiceClient, protos.ServerServic
         if err != nil {
                 return nil, nil, nil, nil, nil, nil, err
         }
-        return (
-                protos.NewTunnelServiceClient(conn),
-                protos.NewServerServiceClient(conn),
-                protos.NewSubscriptionServiceClient(conn),
-                protos.NewSettingsServiceClient(conn),
-                protos.NewRoutingServiceClient(conn),
-                protos.NewDiagnosticsServiceClient(conn),
-                nil,
-        )
+        return protos.NewTunnelServiceClient(conn), protos.NewServerServiceClient(conn), protos.NewSubscriptionServiceClient(conn), protos.NewSettingsServiceClient(conn), protos.NewRoutingServiceClient(conn), protos.NewDiagnosticsServiceClient(conn), nil
 }

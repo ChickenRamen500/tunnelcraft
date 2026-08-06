@@ -13,7 +13,7 @@ import (
 // Service names
 // ============================================================================
 
-const (
+var (
 	TunnelService_ServiceDesc      = grpc.ServiceDesc{ServiceName: "tunnelcraft.v1.TunnelService"}
 	ServerService_ServiceDesc      = grpc.ServiceDesc{ServiceName: "tunnelcraft.v1.ServerService"}
 	SubscriptionService_ServiceDesc = grpc.ServiceDesc{ServiceName: "tunnelcraft.v1.SubscriptionService"}
