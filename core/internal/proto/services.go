@@ -17,14 +17,27 @@ var (
     TunnelService_ServiceDesc = grpc.ServiceDesc{
         ServiceName: "tunnelcraft.v1.TunnelService",
         HandlerType: (*TunnelServiceServer)(nil),
-        Methods:     []grpc.MethodDesc{},
+        Methods: []grpc.MethodDesc{
+            {MethodName: "Connect", Handler: _TunnelService_Connect_Handler},
+            {MethodName: "Disconnect", Handler: _TunnelService_Disconnect_Handler},
+            {MethodName: "GetConnectionStatus", Handler: _TunnelService_GetConnectionStatus_Handler},
+            {MethodName: "Reconnect", Handler: _TunnelService_Reconnect_Handler},
+        },
         Streams:     []grpc.StreamDesc{},
         Metadata:    "proto/tunnelcraft.proto",
     }
     ServerService_ServiceDesc = grpc.ServiceDesc{
         ServiceName: "tunnelcraft.v1.ServerService",
         HandlerType: (*ServerServiceServer)(nil),
-        Methods:     []grpc.MethodDesc{},
+        Methods: []grpc.MethodDesc{
+            {MethodName: "ListServers", Handler: _ServerService_ListServers_Handler},
+            {MethodName: "GetServer", Handler: _ServerService_GetServer_Handler},
+            {MethodName: "CreateServer", Handler: _ServerService_CreateServer_Handler},
+            {MethodName: "UpdateServer", Handler: _ServerService_UpdateServer_Handler},
+            {MethodName: "DeleteServer", Handler: _ServerService_DeleteServer_Handler},
+            {MethodName: "ImportServers", Handler: _ServerService_ImportServers_Handler},
+            {MethodName: "ExportServer", Handler: _ServerService_ExportServer_Handler},
+        },
         Streams:     []grpc.StreamDesc{},
         Metadata:    "proto/tunnelcraft.proto",
     }
@@ -116,6 +129,43 @@ func (UnimplementedTunnelServiceServer) Reconnect(context.Context, *ReconnectReq
 func RegisterTunnelServiceServer(s *grpc.Server, srv TunnelServiceServer) {
 	s.RegisterService(&TunnelService_ServiceDesc, srv)
 }
+func _TunnelService_Connect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConnectRequest)
+	if err := dec(in); err != nil { return nil, err }
+	if interceptor == nil { return srv.(TunnelServiceServer).Connect(ctx, in) }
+	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/tunnelcraft.v1.TunnelService/Connect"}
+	return interceptor(ctx, in, info, func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TunnelServiceServer).Connect(ctx, req.(*ConnectRequest))
+	})
+}
+func _TunnelService_Disconnect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DisconnectRequest)
+	if err := dec(in); err != nil { return nil, err }
+	if interceptor == nil { return srv.(TunnelServiceServer).Disconnect(ctx, in) }
+	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/tunnelcraft.v1.TunnelService/Disconnect"}
+	return interceptor(ctx, in, info, func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TunnelServiceServer).Disconnect(ctx, req.(*DisconnectRequest))
+	})
+}
+func _TunnelService_GetConnectionStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetConnectionStatusRequest)
+	if err := dec(in); err != nil { return nil, err }
+	if interceptor == nil { return srv.(TunnelServiceServer).GetConnectionStatus(ctx, in) }
+	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/tunnelcraft.v1.TunnelService/GetConnectionStatus"}
+	return interceptor(ctx, in, info, func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TunnelServiceServer).GetConnectionStatus(ctx, req.(*GetConnectionStatusRequest))
+	})
+}
+func _TunnelService_Reconnect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReconnectRequest)
+	if err := dec(in); err != nil { return nil, err }
+	if interceptor == nil { return srv.(TunnelServiceServer).Reconnect(ctx, in) }
+	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/tunnelcraft.v1.TunnelService/Reconnect"}
+	return interceptor(ctx, in, info, func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TunnelServiceServer).Reconnect(ctx, req.(*ReconnectRequest))
+	})
+}
+
 
 func NewTunnelServiceClient(cc grpc.ClientConnInterface) TunnelServiceClient {
 	return nil // stub
@@ -184,6 +234,70 @@ func (UnimplementedServerServiceServer) PingServer(*PingServerRequest, ServerSer
 func RegisterServerServiceServer(s *grpc.Server, srv ServerServiceServer) {
 	s.RegisterService(&ServerService_ServiceDesc, srv)
 }
+func _ServerService_ListServers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListServersRequest)
+	if err := dec(in); err != nil { return nil, err }
+	if interceptor == nil { return srv.(ServerServiceServer).ListServers(ctx, in) }
+	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/tunnelcraft.v1.ServerService/ListServers"}
+	return interceptor(ctx, in, info, func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerServiceServer).ListServers(ctx, req.(*ListServersRequest))
+	})
+}
+func _ServerService_GetServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetServerRequest)
+	if err := dec(in); err != nil { return nil, err }
+	if interceptor == nil { return srv.(ServerServiceServer).GetServer(ctx, in) }
+	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/tunnelcraft.v1.ServerService/GetServer"}
+	return interceptor(ctx, in, info, func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerServiceServer).GetServer(ctx, req.(*GetServerRequest))
+	})
+}
+func _ServerService_CreateServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateServerRequest)
+	if err := dec(in); err != nil { return nil, err }
+	if interceptor == nil { return srv.(ServerServiceServer).CreateServer(ctx, in) }
+	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/tunnelcraft.v1.ServerService/CreateServer"}
+	return interceptor(ctx, in, info, func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerServiceServer).CreateServer(ctx, req.(*CreateServerRequest))
+	})
+}
+func _ServerService_UpdateServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateServerRequest)
+	if err := dec(in); err != nil { return nil, err }
+	if interceptor == nil { return srv.(ServerServiceServer).UpdateServer(ctx, in) }
+	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/tunnelcraft.v1.ServerService/UpdateServer"}
+	return interceptor(ctx, in, info, func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerServiceServer).UpdateServer(ctx, req.(*UpdateServerRequest))
+	})
+}
+func _ServerService_DeleteServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteServerRequest)
+	if err := dec(in); err != nil { return nil, err }
+	if interceptor == nil { return srv.(ServerServiceServer).DeleteServer(ctx, in) }
+	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/tunnelcraft.v1.ServerService/DeleteServer"}
+	return interceptor(ctx, in, info, func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerServiceServer).DeleteServer(ctx, req.(*DeleteServerRequest))
+	})
+}
+func _ServerService_ImportServers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ImportServersRequest)
+	if err := dec(in); err != nil { return nil, err }
+	if interceptor == nil { return srv.(ServerServiceServer).ImportServers(ctx, in) }
+	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/tunnelcraft.v1.ServerService/ImportServers"}
+	return interceptor(ctx, in, info, func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerServiceServer).ImportServers(ctx, req.(*ImportServersRequest))
+	})
+}
+func _ServerService_ExportServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExportServerRequest)
+	if err := dec(in); err != nil { return nil, err }
+	if interceptor == nil { return srv.(ServerServiceServer).ExportServer(ctx, in) }
+	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/tunnelcraft.v1.ServerService/ExportServer"}
+	return interceptor(ctx, in, info, func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerServiceServer).ExportServer(ctx, req.(*ExportServerRequest))
+	})
+}
+
 
 func NewServerServiceClient(cc grpc.ClientConnInterface) ServerServiceClient { return nil }
 
