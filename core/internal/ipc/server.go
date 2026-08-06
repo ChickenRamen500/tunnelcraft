@@ -789,6 +789,31 @@ func settingsToProto(cfg *config.Config) *protos.Settings {
 }
 
 
+
+// securityToString converts a proto Security enum to config string.
+func securityToString(s protos.Security) string {
+        switch s {
+        case protos.Security_SECURITY_NONE: return "none"
+        case protos.Security_SECURITY_TLS: return "tls"
+        case protos.Security_SECURITY_REALITY: return "reality"
+        default: return ""
+        }
+}
+
+// transportToString converts a proto Transport enum to config string.
+func transportToString(t protos.Transport) string {
+        switch t {
+        case protos.Transport_TRANSPORT_TCP: return "tcp"
+        case protos.Transport_TRANSPORT_WS: return "ws"
+        case protos.Transport_TRANSPORT_GRPC: return "grpc"
+        case protos.Transport_TRANSPORT_KCP: return "kcp"
+        case protos.Transport_TRANSPORT_XHTTP: return "xhttp"
+        case protos.Transport_TRANSPORT_HTTPUPGRADE: return "httpupgrade"
+        case protos.Transport_TRANSPORT_QUIC: return "quic"
+        default: return ""
+        }
+}
+
 // protoToServerEntry converts a proto Server message to a config ServerEntry.
 func protoToServerEntry(pb *protos.Server) config.ServerEntry {
         entry := config.ServerEntry{
@@ -806,7 +831,7 @@ func protoToServerEntry(pb *protos.Server) config.ServerEntry {
         if pb.Xray != nil {
                 entry.XrayConfig = &config.XrayConfigEntry{
                         UUID: pb.Xray.Uuid, Flow: pb.Xray.Flow,
-                        Security: pb.Xray.Security.String(), Transport: pb.Xray.Transport.String(),
+                        Security: securityToString(pb.Xray.Security), Transport: transportToString(pb.Xray.Transport),
                         SNI: pb.Xray.Sni, Fingerprint: pb.Xray.Fingerprint,
                         ALPN: pb.Xray.Alpn, PublicKey: pb.Xray.PublicKey,
                         ShortID: pb.Xray.ShortId, KCPSeed: pb.Xray.KcpSeed,
