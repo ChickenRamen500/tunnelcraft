@@ -1,0 +1,23 @@
+[package]
+name = "tunnelcraft-ui"
+version = "0.1.0"
+description = "TunnelCraft VPN Client"
+authors = ["TunnelCraft Contributors"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tonic = { version = "0.12", features = ["transport", "prost"] }
+prost = "0.13"
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
