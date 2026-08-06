@@ -181,6 +181,16 @@ func (f *FallbackManager) evaluate() {
         }
 }
 
+// ActivateFallback is the public method to trigger fallback.
+func (f *FallbackManager) ActivateFallback(serverID string) {
+    f.activateFallback(serverID)
+}
+
+// DeactivateFallback is the public method to cancel fallback.
+func (f *FallbackManager) DeactivateFallback() {
+    f.deactivateFallback()
+}
+
 // activateFallback switches to the local WG/AWG fallback server.
 func (f *FallbackManager) activateFallback(fallbackServerID string) {
         if fallbackServerID == "" {
