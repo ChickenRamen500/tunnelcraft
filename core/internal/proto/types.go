@@ -112,7 +112,6 @@ type MetadataEntry struct {
 }
 
 func (*MetadataEntry) ProtoMessage()               {}
-func (x *MetadataEntry) ProtoReflect() interface{} { return nil }
 
 type GeoLocation struct {
 	Country     string  `protobuf:"bytes,1,opt,name=country,proto3" json:"country,omitempty"`
@@ -124,7 +123,6 @@ type GeoLocation struct {
 }
 
 func (*GeoLocation) ProtoMessage()               {}
-func (x *GeoLocation) ProtoReflect() interface{} { return nil }
 
 type BandwidthStats struct {
 	BytesUploaded   uint64           `protobuf:"varint,1,opt,name=bytes_uploaded,json=bytesUploaded,proto3" json:"bytes_uploaded,omitempty"`
@@ -134,7 +132,6 @@ type BandwidthStats struct {
 }
 
 func (*BandwidthStats) ProtoMessage()               {}
-func (x *BandwidthStats) ProtoReflect() interface{} { return nil }
 
 type LatencySample struct {
 	Sequence  uint32          `protobuf:"varint,1,opt,name=sequence,proto3" json:"sequence,omitempty"`
@@ -143,7 +140,6 @@ type LatencySample struct {
 }
 
 func (*LatencySample) ProtoMessage()               {}
-func (x *LatencySample) ProtoReflect() interface{} { return nil }
 
 // ============================================================================
 // Protocol Config Messages
@@ -168,7 +164,6 @@ type XrayConfig struct {
 }
 
 func (*XrayConfig) ProtoMessage()               {}
-func (x *XrayConfig) ProtoReflect() interface{} { return nil }
 
 type WireGuardConfig struct {
 	PrivateKey         string `protobuf:"bytes,1,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
@@ -182,7 +177,6 @@ type WireGuardConfig struct {
 }
 
 func (*WireGuardConfig) ProtoMessage()               {}
-func (x *WireGuardConfig) ProtoReflect() interface{} { return nil }
 
 type HysteriaConfig struct {
 	AuthPassword string `protobuf:"bytes,1,opt,name=auth_password,json=authPassword,proto3" json:"auth_password,omitempty"`
@@ -197,7 +191,6 @@ type HysteriaConfig struct {
 }
 
 func (*HysteriaConfig) ProtoMessage()               {}
-func (x *HysteriaConfig) ProtoReflect() interface{} { return nil }
 
 type ShadowsocksConfig struct {
 	Method     string `protobuf:"bytes,1,opt,name=method,proto3" json:"method,omitempty"`
@@ -207,7 +200,6 @@ type ShadowsocksConfig struct {
 }
 
 func (*ShadowsocksConfig) ProtoMessage()               {}
-func (x *ShadowsocksConfig) ProtoReflect() interface{} { return nil }
 
 type AmneziaWGConfig struct {
 	PrivateKey  string `protobuf:"bytes,1,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
@@ -219,7 +211,6 @@ type AmneziaWGConfig struct {
 }
 
 func (*AmneziaWGConfig) ProtoMessage()               {}
-func (x *AmneziaWGConfig) ProtoReflect() interface{} { return nil }
 
 type SSHConfig struct {
 	Username      string `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
@@ -229,7 +220,6 @@ type SSHConfig struct {
 }
 
 func (*SSHConfig) ProtoMessage()               {}
-func (x *SSHConfig) ProtoReflect() interface{} { return nil }
 
 // ============================================================================
 // Server
@@ -259,7 +249,6 @@ type Server struct {
 }
 
 func (*Server) ProtoMessage()               {}
-func (x *Server) ProtoReflect() interface{} { return nil }
 
 // ============================================================================
 // Subscription
@@ -281,7 +270,6 @@ type Subscription struct {
 }
 
 func (*Subscription) ProtoMessage()               {}
-func (x *Subscription) ProtoReflect() interface{} { return nil }
 
 // ============================================================================
 // Routing
@@ -301,7 +289,6 @@ type RoutingRule struct {
 }
 
 func (*RoutingRule) ProtoMessage()               {}
-func (x *RoutingRule) ProtoReflect() interface{} { return nil }
 
 type RoutingConfig struct {
 	DomainStrategy string        `protobuf:"bytes,1,opt,name=domain_strategy,json=domainStrategy,proto3" json:"domain_strategy,omitempty"`
@@ -309,7 +296,6 @@ type RoutingConfig struct {
 }
 
 func (*RoutingConfig) ProtoMessage()               {}
-func (x *RoutingConfig) ProtoReflect() interface{} { return nil }
 
 // ============================================================================
 // Settings
@@ -339,7 +325,6 @@ type Settings struct {
 }
 
 func (*Settings) ProtoMessage()               {}
-func (x *Settings) ProtoReflect() interface{} { return nil }
 
 // ============================================================================
 // TunnelService messages
@@ -352,7 +337,6 @@ type ConnectRequest struct {
 }
 
 func (*ConnectRequest) ProtoMessage()               {}
-func (x *ConnectRequest) ProtoReflect() interface{} { return nil }
 
 type ConnectResponse struct {
 	State       ConnectionState   `protobuf:"varint,1,opt,name=state,proto3,enum=tunnelcraft.v1.ConnectionState" json:"state,omitempty"`
@@ -364,13 +348,11 @@ type ConnectResponse struct {
 }
 
 func (*ConnectResponse) ProtoMessage()               {}
-func (x *ConnectResponse) ProtoReflect() interface{} { return nil }
 
 type DisconnectRequest struct {
 	Force bool `protobuf:"varint,1,opt,name=force,proto3" json:"force,omitempty"`
 }
 func (*DisconnectRequest) ProtoMessage()               {}
-func (x *DisconnectRequest) ProtoReflect() interface{} { return nil }
 
 type DisconnectResponse struct {
 	State      ConnectionState `protobuf:"varint,1,opt,name=state,proto3,enum=tunnelcraft.v1.ConnectionState" json:"state,omitempty"`
@@ -378,11 +360,9 @@ type DisconnectResponse struct {
 	Error      string           `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
 }
 func (*DisconnectResponse) ProtoMessage()               {}
-func (x *DisconnectResponse) ProtoReflect() interface{} { return nil }
 
 type WatchConnectionRequest struct{}
 func (*WatchConnectionRequest) ProtoMessage()               {}
-func (x *WatchConnectionRequest) ProtoReflect() interface{} { return nil }
 
 type ConnectionStateEvent struct {
 	Timestamp *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
@@ -392,11 +372,9 @@ type ConnectionStateEvent struct {
 	ServerId  string                  `protobuf:"bytes,5,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
 }
 func (*ConnectionStateEvent) ProtoMessage()               {}
-func (x *ConnectionStateEvent) ProtoReflect() interface{} { return nil }
 
 type GetConnectionStatusRequest struct{}
 func (*GetConnectionStatusRequest) ProtoMessage()               {}
-func (x *GetConnectionStatusRequest) ProtoReflect() interface{} { return nil }
 
 type GetConnectionStatusResponse struct {
 	State       ConnectionState   `protobuf:"varint,1,opt,name=state,proto3,enum=tunnelcraft.v1.ConnectionState" json:"state,omitempty"`
@@ -409,13 +387,11 @@ type GetConnectionStatusResponse struct {
 	LocalIp     string                `protobuf:"bytes,8,opt,name=local_ip,json=localIp,proto3" json:"local_ip,omitempty"`
 }
 func (*GetConnectionStatusResponse) ProtoMessage()               {}
-func (x *GetConnectionStatusResponse) ProtoReflect() interface{} { return nil }
 
 type ReconnectRequest struct {
 	ServerId string `protobuf:"bytes,1,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
 }
 func (*ReconnectRequest) ProtoMessage()               {}
-func (x *ReconnectRequest) ProtoReflect() interface{} { return nil }
 
 type ReconnectResponse struct {
 	State    ConnectionState `protobuf:"varint,1,opt,name=state,proto3,enum=tunnelcraft.v1.ConnectionState" json:"state,omitempty"`
@@ -423,7 +399,6 @@ type ReconnectResponse struct {
 	Error    string           `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
 }
 func (*ReconnectResponse) ProtoMessage()               {}
-func (x *ReconnectResponse) ProtoReflect() interface{} { return nil }
 
 // ============================================================================
 // ServerService messages
@@ -437,40 +412,33 @@ type ListServersRequest struct {
 	SearchQuery    string   `protobuf:"bytes,5,opt,name=search_query,json=searchQuery,proto3" json:"search_query,omitempty"`
 }
 func (*ListServersRequest) ProtoMessage()               {}
-func (x *ListServersRequest) ProtoReflect() interface{} { return nil }
 
 type ListServersResponse struct {
 	Servers []*Server `protobuf:"bytes,1,rep,name=servers,proto3" json:"servers,omitempty"`
 	Total   int32      `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
 }
 func (*ListServersResponse) ProtoMessage()               {}
-func (x *ListServersResponse) ProtoReflect() interface{} { return nil }
 
 type GetServerRequest struct{Id string}
 func (*GetServerRequest) ProtoMessage()               {}
-func (x *GetServerRequest) ProtoReflect() interface{} { return nil }
 
 type CreateServerRequest struct{Server *Server}
 func (*CreateServerRequest) ProtoMessage()               {}
-func (x *CreateServerRequest) ProtoReflect() interface{} { return nil }
 
 type UpdateServerRequest struct {
 	Server     *Server                `protobuf:"bytes,1,opt,name=server,proto3" json:"server,omitempty"`
 	UpdateMask *fieldmaskpb.FieldMask `protobuf:"bytes,2,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
 }
 func (*UpdateServerRequest) ProtoMessage()               {}
-func (x *UpdateServerRequest) ProtoReflect() interface{} { return nil }
 
 type DeleteServerRequest struct{Id string}
 func (*DeleteServerRequest) ProtoMessage()               {}
-func (x *DeleteServerRequest) ProtoReflect() interface{} { return nil }
 
 type TestServersRequest struct {
 	ServerIds     []string `protobuf:"bytes,1,rep,name=server_ids,json=serverIds,proto3" json:"server_ids,omitempty"`
 	TimeoutSeconds uint32  `protobuf:"varint,2,opt,name=timeout_seconds,json=timeoutSeconds,proto3" json:"timeout_seconds,omitempty"`
 }
 func (*TestServersRequest) ProtoMessage()               {}
-func (x *TestServersRequest) ProtoReflect() interface{} { return nil }
 
 type ServerTestResult struct {
 	ServerId string            `protobuf:"bytes,1,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
@@ -480,7 +448,6 @@ type ServerTestResult struct {
 	Status    ServerStatus      `protobuf:"varint,5,opt,name=status,proto3,enum=tunnelcraft.v1.ServerStatus" json:"status,omitempty"`
 }
 func (*ServerTestResult) ProtoMessage()               {}
-func (x *ServerTestResult) ProtoReflect() interface{} { return nil }
 
 type ImportServersRequest struct {
 	Content        string `protobuf:"bytes,1,opt,name=content,proto3" json:"content,omitempty"`
@@ -488,7 +455,6 @@ type ImportServersRequest struct {
 	GroupName      string `protobuf:"bytes,3,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
 }
 func (*ImportServersRequest) ProtoMessage()               {}
-func (x *ImportServersRequest) ProtoReflect() interface{} { return nil }
 
 type ImportServersResponse struct {
 	ImportedServerIds []string `protobuf:"bytes,1,rep,name=imported_server_ids,json=importedServerIds,proto3" json:"imported_server_ids,omitempty"`
@@ -497,15 +463,12 @@ type ImportServersResponse struct {
 	Errors            []string `protobuf:"bytes,4,rep,name=errors,proto3" json:"errors,omitempty"`
 }
 func (*ImportServersResponse) ProtoMessage()               {}
-func (x *ImportServersResponse) ProtoReflect() interface{} { return nil }
 
 type ExportServerRequest struct{ServerId string}
 func (*ExportServerRequest) ProtoMessage()               {}
-func (x *ExportServerRequest) ProtoReflect() interface{} { return nil }
 
 type ExportServerResponse struct{ShareLink string}
 func (*ExportServerResponse) ProtoMessage()               {}
-func (x *ExportServerResponse) ProtoReflect() interface{} { return nil }
 
 type PingServerRequest struct {
 	ServerId string            `protobuf:"bytes,1,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
@@ -513,7 +476,6 @@ type PingServerRequest struct {
 	Interval  *durationpb.Duration `protobuf:"bytes,3,opt,name=interval,proto3" json:"interval,omitempty"`
 }
 func (*PingServerRequest) ProtoMessage()               {}
-func (x *PingServerRequest) ProtoReflect() interface{} { return nil }
 
 // ============================================================================
 // SubscriptionService messages
@@ -521,36 +483,29 @@ func (x *PingServerRequest) ProtoReflect() interface{} { return nil }
 
 type ListSubscriptionsRequest struct{}
 func (*ListSubscriptionsRequest) ProtoMessage()               {}
-func (x *ListSubscriptionsRequest) ProtoReflect() interface{} { return nil }
 
 type ListSubscriptionsResponse struct {
 	Subscriptions []*Subscription `protobuf:"bytes,1,rep,name=subscriptions,proto3" json:"subscriptions,omitempty"`
 }
 func (*ListSubscriptionsResponse) ProtoMessage()               {}
-func (x *ListSubscriptionsResponse) ProtoReflect() interface{} { return nil }
 
 type GetSubscriptionRequest struct{Id string}
 func (*GetSubscriptionRequest) ProtoMessage()               {}
-func (x *GetSubscriptionRequest) ProtoReflect() interface{} { return nil }
 
 type CreateSubscriptionRequest struct{Subscription *Subscription}
 func (*CreateSubscriptionRequest) ProtoMessage()               {}
-func (x *CreateSubscriptionRequest) ProtoReflect() interface{} { return nil }
 
 type UpdateSubscriptionRequest struct {
 	Subscription *Subscription           `protobuf:"bytes,1,opt,name=subscription,proto3" json:"subscription,omitempty"`
 	UpdateMask  *fieldmaskpb.FieldMask `protobuf:"bytes,2,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
 }
 func (*UpdateSubscriptionRequest) ProtoMessage()               {}
-func (x *UpdateSubscriptionRequest) ProtoReflect() interface{} { return nil }
 
 type DeleteSubscriptionRequest struct{Id string}
 func (*DeleteSubscriptionRequest) ProtoMessage()               {}
-func (x *DeleteSubscriptionRequest) ProtoReflect() interface{} { return nil }
 
 type RefreshSubscriptionRequest struct{Id string}
 func (*RefreshSubscriptionRequest) ProtoMessage()               {}
-func (x *RefreshSubscriptionRequest) ProtoReflect() interface{} { return nil }
 
 type RefreshSubscriptionResponse struct {
 	Subscription  *Subscription `protobuf:"bytes,1,opt,name=subscription,proto3" json:"subscription,omitempty"`
@@ -560,11 +515,9 @@ type RefreshSubscriptionResponse struct {
 	Removed      int32        `protobuf:"varint,5,opt,name=removed,proto3" json:"removed,omitempty"`
 }
 func (*RefreshSubscriptionResponse) ProtoMessage()               {}
-func (x *RefreshSubscriptionResponse) ProtoReflect() interface{} { return nil }
 
 type StreamRefreshRequest struct{Id string}
 func (*StreamRefreshRequest) ProtoMessage()               {}
-func (x *StreamRefreshRequest) ProtoReflect() interface{} { return nil }
 
 type RefreshProgress struct {
 	Percent  float32 `protobuf:"fixed32,1,opt,name=percent,proto3" json:"percent,omitempty"`
@@ -574,7 +527,6 @@ type RefreshProgress struct {
 	Error    string  `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`
 }
 func (*RefreshProgress) ProtoMessage()               {}
-func (x *RefreshProgress) ProtoReflect() interface{} { return nil }
 
 // ============================================================================
 // SettingsService messages
@@ -582,18 +534,15 @@ func (x *RefreshProgress) ProtoReflect() interface{} { return nil }
 
 type GetSettingsRequest struct{}
 func (*GetSettingsRequest) ProtoMessage()               {}
-func (x *GetSettingsRequest) ProtoReflect() interface{} { return nil }
 
 type UpdateSettingsRequest struct {
 	Settings    *Settings              `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"`
 	UpdateMask  *fieldmaskpb.FieldMask `protobuf:"bytes,2,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
 }
 func (*UpdateSettingsRequest) ProtoMessage()               {}
-func (x *UpdateSettingsRequest) ProtoReflect() interface{} { return nil }
 
 type ResetSettingsRequest struct{}
 func (*ResetSettingsRequest) ProtoMessage()               {}
-func (x *ResetSettingsRequest) ProtoReflect() interface{} { return nil }
 
 // ============================================================================
 // RoutingService messages
@@ -601,42 +550,33 @@ func (x *ResetSettingsRequest) ProtoReflect() interface{} { return nil }
 
 type GetRoutingRequest struct{}
 func (*GetRoutingRequest) ProtoMessage()               {}
-func (x *GetRoutingRequest) ProtoReflect() interface{} { return nil }
 
 type UpdateRoutingRequest struct{Routing *RoutingConfig}
 func (*UpdateRoutingRequest) ProtoMessage()               {}
-func (x *UpdateRoutingRequest) ProtoReflect() interface{} { return nil }
 
 type ListRulesRequest struct{Action RuleAction}
 func (*ListRulesRequest) ProtoMessage()               {}
-func (x *ListRulesRequest) ProtoReflect() interface{} { return nil }
 
 type ListRulesResponse struct{Rules []*RoutingRule}
 func (*ListRulesResponse) ProtoMessage()               {}
-func (x *ListRulesResponse) ProtoReflect() interface{} { return nil }
 
 type CreateRuleRequest struct{Rule *RoutingRule}
 func (*CreateRuleRequest) ProtoMessage()               {}
-func (x *CreateRuleRequest) ProtoReflect() interface{} { return nil }
 
 type UpdateRuleRequest struct {
 	Rule        *RoutingRule           `protobuf:"bytes,1,opt,name=rule,proto3" json:"rule,omitempty"`
 	UpdateMask  *fieldmaskpb.FieldMask `protobuf:"bytes,2,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
 }
 func (*UpdateRuleRequest) ProtoMessage()               {}
-func (x *UpdateRuleRequest) ProtoReflect() interface{} { return nil }
 
 type DeleteRuleRequest struct{Id string}
 func (*DeleteRuleRequest) ProtoMessage()               {}
-func (x *DeleteRuleRequest) ProtoReflect() interface{} { return nil }
 
 type ReorderRulesRequest struct{RuleIds []string}
 func (*ReorderRulesRequest) ProtoMessage()               {}
-func (x *ReorderRulesRequest) ProtoReflect() interface{} { return nil }
 
 type ReorderRulesResponse struct{Rules []*RoutingRule}
 func (*ReorderRulesResponse) ProtoMessage()               {}
-func (x *ReorderRulesResponse) ProtoReflect() interface{} { return nil }
 
 // ============================================================================
 // DiagnosticsService messages
@@ -648,7 +588,6 @@ type StreamLogsRequest struct {
 	Tail      bool     `protobuf:"varint,3,opt,name=tail,proto3" json:"tail,omitempty"`
 }
 func (*StreamLogsRequest) ProtoMessage()               {}
-func (x *StreamLogsRequest) ProtoReflect() interface{} { return nil }
 
 type LogEntry struct {
 	Timestamp *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
@@ -658,7 +597,6 @@ type LogEntry struct {
 	Fields    []*MetadataEntry      `protobuf:"bytes,5,rep,name=fields,proto3" json:"fields,omitempty"`
 }
 func (*LogEntry) ProtoMessage()               {}
-func (x *LogEntry) ProtoReflect() interface{} { return nil }
 
 type SpeedTestRequest struct {
 	DurationSeconds uint32 `protobuf:"varint,1,opt,name=duration_seconds,json=durationSeconds,proto3" json:"duration_seconds,omitempty"`
@@ -666,7 +604,6 @@ type SpeedTestRequest struct {
 	ServerId        string `protobuf:"bytes,3,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
 }
 func (*SpeedTestRequest) ProtoMessage()               {}
-func (x *SpeedTestRequest) ProtoReflect() interface{} { return nil }
 
 type SpeedTestSample struct {
 	Phase       string          `protobuf:"bytes,1,opt,name=phase,proto3" json:"phase,omitempty"`
@@ -677,7 +614,6 @@ type SpeedTestSample struct {
 	FinalResult *SpeedTestResult `protobuf:"bytes,6,opt,name=final_result,json=finalResult,proto3" json:"final_result,omitempty"`
 }
 func (*SpeedTestSample) ProtoMessage()               {}
-func (x *SpeedTestSample) ProtoReflect() interface{} { return nil }
 
 type SpeedTestResult struct {
 	DownloadMbps float32 `protobuf:"fixed32,1,opt,name=download_mbps,json=downloadMbps,proto3" json:"download_mbps,omitempty"`
@@ -687,11 +623,9 @@ type SpeedTestResult struct {
 	PacketLoss   float32 `protobuf:"fixed32,5,opt,name=packet_loss,json=packetLoss,proto3" json:"packet_loss,omitempty"`
 }
 func (*SpeedTestResult) ProtoMessage()               {}
-func (x *SpeedTestResult) ProtoReflect() interface{} { return nil }
 
 type HealthCheckRequest struct{}
 func (*HealthCheckRequest) ProtoMessage()               {}
-func (x *HealthCheckRequest) ProtoReflect() interface{} { return nil }
 
 type HealthCheckResponse struct {
 	Healthy   bool                  `protobuf:"varint,1,opt,name=healthy,proto3" json:"healthy,omitempty"`
@@ -700,11 +634,9 @@ type HealthCheckResponse struct {
 	Checks    []string              `protobuf:"bytes,4,rep,name=checks,proto3" json:"checks,omitempty"`
 }
 func (*HealthCheckResponse) ProtoMessage()               {}
-func (x *HealthCheckResponse) ProtoReflect() interface{} { return nil }
 
 type GetDaemonInfoRequest struct{}
 func (*GetDaemonInfoRequest) ProtoMessage()               {}
-func (x *GetDaemonInfoRequest) ProtoReflect() interface{} { return nil }
 
 type DaemonInfo struct {
 	Version           string                `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
@@ -723,7 +655,6 @@ type DaemonInfo struct {
 	StartedAt          *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
 }
 func (*DaemonInfo) ProtoMessage()               {}
-func (x *DaemonInfo) ProtoReflect() interface{} { return nil }
 
 type GenerateReportRequest struct {
 	IncludeLogs   bool `protobuf:"varint,1,opt,name=include_logs,json=includeLogs,proto3" json:"include_logs,omitempty"`
@@ -731,14 +662,12 @@ type GenerateReportRequest struct {
 	IncludeStats  bool `protobuf:"varint,3,opt,name=include_stats,json=includeStats,proto3" json:"include_stats,omitempty"`
 }
 func (*GenerateReportRequest) ProtoMessage()               {}
-func (x *GenerateReportRequest) ProtoReflect() interface{} { return nil }
 
 type GenerateReportResponse struct {
 	ReportZip []byte `protobuf:"bytes,1,opt,name=report_zip,json=reportZip,proto3" json:"report_zip,omitempty"`
 	Filename   string `protobuf:"bytes,2,opt,name=filename,proto3" json:"filename,omitempty"`
 }
 func (*GenerateReportResponse) ProtoMessage()               {}
-func (x *GenerateReportResponse) ProtoReflect() interface{} { return nil }
 
 // ============================================================================
 // BackupService messages
@@ -753,14 +682,12 @@ type ExportBackupRequest struct {
 	Passphrase           string `protobuf:"bytes,6,opt,name=passphrase,proto3" json:"passphrase,omitempty"`
 }
 func (*ExportBackupRequest) ProtoMessage()               {}
-func (x *ExportBackupRequest) ProtoReflect() interface{} { return nil }
 
 type ExportBackupResponse struct {
 	Data     []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
 	Filename string `protobuf:"bytes,2,opt,name=filename,proto3" json:"filename,omitempty"`
 }
 func (*ExportBackupResponse) ProtoMessage()               {}
-func (x *ExportBackupResponse) ProtoReflect() interface{} { return nil }
 
 type ImportBackupRequest struct {
 	Data       []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
@@ -768,7 +695,6 @@ type ImportBackupRequest struct {
 	Merge      bool   `protobuf:"varint,3,opt,name=merge,proto3" json:"merge,omitempty"`
 }
 func (*ImportBackupRequest) ProtoMessage()               {}
-func (x *ImportBackupRequest) ProtoReflect() interface{} { return nil }
 
 type ImportBackupResponse struct {
 	ServersImported      int32    `protobuf:"varint,1,opt,name=servers_imported,json=serversImported,proto3" json:"servers_imported,omitempty"`
@@ -778,4 +704,105 @@ type ImportBackupResponse struct {
 	Warnings              []string `protobuf:"bytes,5,rep,name=warnings,proto3" json:"warnings,omitempty"`
 }
 func (*ImportBackupResponse) ProtoMessage()               {}
-func (x *ImportBackupResponse) ProtoReflect() interface{} { return nil }
+
+// Auto-generated Reset/String methods for gRPC compatibility
+func (*MetadataEntry) Reset() {}
+func (*MetadataEntry) String() string { return "" }
+func (*GeoLocation) Reset() {}
+func (*GeoLocation) String() string { return "" }
+func (*BandwidthStats) Reset() {}
+func (*BandwidthStats) String() string { return "" }
+func (*LatencySample) Reset() {}
+func (*LatencySample) String() string { return "" }
+func (*XrayConfig) Reset() {}
+func (*XrayConfig) String() string { return "" }
+func (*WireGuardConfig) Reset() {}
+func (*WireGuardConfig) String() string { return "" }
+func (*HysteriaConfig) Reset() {}
+func (*HysteriaConfig) String() string { return "" }
+func (*ShadowsocksConfig) Reset() {}
+func (*ShadowsocksConfig) String() string { return "" }
+func (*AmneziaWGConfig) Reset() {}
+func (*AmneziaWGConfig) String() string { return "" }
+func (*SSHConfig) Reset() {}
+func (*SSHConfig) String() string { return "" }
+func (*Server) Reset() {}
+func (*Server) String() string { return "" }
+func (*Subscription) Reset() {}
+func (*Subscription) String() string { return "" }
+func (*RoutingRule) Reset() {}
+func (*RoutingRule) String() string { return "" }
+func (*RoutingConfig) Reset() {}
+func (*RoutingConfig) String() string { return "" }
+func (*Settings) Reset() {}
+func (*Settings) String() string { return "" }
+func (*ConnectRequest) Reset() {}
+func (*ConnectRequest) String() string { return "" }
+func (*ConnectResponse) Reset() {}
+func (*ConnectResponse) String() string { return "" }
+func (*DisconnectRequest) Reset() {}
+func (*DisconnectRequest) String() string { return "" }
+func (*DisconnectResponse) Reset() {}
+func (*DisconnectResponse) String() string { return "" }
+func (*ConnectionStateEvent) Reset() {}
+func (*ConnectionStateEvent) String() string { return "" }
+func (*GetConnectionStatusResponse) Reset() {}
+func (*GetConnectionStatusResponse) String() string { return "" }
+func (*ReconnectRequest) Reset() {}
+func (*ReconnectRequest) String() string { return "" }
+func (*ReconnectResponse) Reset() {}
+func (*ReconnectResponse) String() string { return "" }
+func (*ListServersRequest) Reset() {}
+func (*ListServersRequest) String() string { return "" }
+func (*ListServersResponse) Reset() {}
+func (*ListServersResponse) String() string { return "" }
+func (*UpdateServerRequest) Reset() {}
+func (*UpdateServerRequest) String() string { return "" }
+func (*TestServersRequest) Reset() {}
+func (*TestServersRequest) String() string { return "" }
+func (*ServerTestResult) Reset() {}
+func (*ServerTestResult) String() string { return "" }
+func (*ImportServersRequest) Reset() {}
+func (*ImportServersRequest) String() string { return "" }
+func (*ImportServersResponse) Reset() {}
+func (*ImportServersResponse) String() string { return "" }
+func (*PingServerRequest) Reset() {}
+func (*PingServerRequest) String() string { return "" }
+func (*ListSubscriptionsResponse) Reset() {}
+func (*ListSubscriptionsResponse) String() string { return "" }
+func (*UpdateSubscriptionRequest) Reset() {}
+func (*UpdateSubscriptionRequest) String() string { return "" }
+func (*RefreshSubscriptionResponse) Reset() {}
+func (*RefreshSubscriptionResponse) String() string { return "" }
+func (*RefreshProgress) Reset() {}
+func (*RefreshProgress) String() string { return "" }
+func (*UpdateSettingsRequest) Reset() {}
+func (*UpdateSettingsRequest) String() string { return "" }
+func (*UpdateRuleRequest) Reset() {}
+func (*UpdateRuleRequest) String() string { return "" }
+func (*StreamLogsRequest) Reset() {}
+func (*StreamLogsRequest) String() string { return "" }
+func (*LogEntry) Reset() {}
+func (*LogEntry) String() string { return "" }
+func (*SpeedTestRequest) Reset() {}
+func (*SpeedTestRequest) String() string { return "" }
+func (*SpeedTestSample) Reset() {}
+func (*SpeedTestSample) String() string { return "" }
+func (*SpeedTestResult) Reset() {}
+func (*SpeedTestResult) String() string { return "" }
+func (*HealthCheckResponse) Reset() {}
+func (*HealthCheckResponse) String() string { return "" }
+func (*DaemonInfo) Reset() {}
+func (*DaemonInfo) String() string { return "" }
+func (*GenerateReportRequest) Reset() {}
+func (*GenerateReportRequest) String() string { return "" }
+func (*GenerateReportResponse) Reset() {}
+func (*GenerateReportResponse) String() string { return "" }
+func (*ExportBackupRequest) Reset() {}
+func (*ExportBackupRequest) String() string { return "" }
+func (*ExportBackupResponse) Reset() {}
+func (*ExportBackupResponse) String() string { return "" }
+func (*ImportBackupRequest) Reset() {}
+func (*ImportBackupRequest) String() string { return "" }
+func (*ImportBackupResponse) Reset() {}
+func (*ImportBackupResponse) String() string { return "" }
