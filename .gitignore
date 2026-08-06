@@ -1,0 +1,57 @@
+# Binaries
+bin/*
+!bin/.gitkeep
+
+# Go
+core/tunnelcraftd
+core/tunnelcraftd.exe
+core/**/*.exe
+core/vendor/
+
+# Node / React / Vite
+ui/node_modules/
+ui/dist/
+ui/src-tauri/target/
+ui/.vite/
+
+# Rust
+ui/src-tauri/target/
+**/*.rs.bk
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+*.dll
+*.so
+*.dylib
+*.pdb
+*.obj
+*.o
+*.a
+
+# Config files with secrets
+configs/local/
+
+# Logs
+*.log
+logs/
+
+# Temp
+tmp/
+temp/

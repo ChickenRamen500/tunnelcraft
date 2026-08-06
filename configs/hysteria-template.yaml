@@ -1,0 +1,20 @@
+server: {{SERVER_HOST}}:{{SERVER_PORT}}
+
+auth_str: {{AUTH_PASSWORD}}
+
+tls:
+  sni: {{SNI}}
+  insecure: {{INSECURE}}
+
+socks5:
+  listen: 127.0.0.1:{{SOCKS_PORT}}
+
+http:
+  listen: 127.0.0.1:{{HTTP_PORT}}
+
+bandwidth:
+  up: {{BANDWIDTH_UP}}
+  down: {{BANDWIDTH_DOWN}}
+
+fast_open: true
+lazy: false

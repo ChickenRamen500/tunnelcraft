@@ -1,0 +1,66 @@
+{
+  "log": {
+    "loglevel": "warning"
+  },
+  "inbounds": [
+    {
+      "tag": "tunnelcraft-in",
+      "port": {{SOCKS_PORT}},
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "auth": "noauth",
+        "udp": true
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "{{PROTOCOL}}",
+      "settings": {
+        "vnext": [
+          {
+            "address": "{{SERVER_HOST}}",
+            "port": {{SERVER_PORT}},
+            "users": [
+              {
+                "id": "{{UUID}}",
+                "encryption": "none",
+                "flow": "{{FLOW}}"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "{{TRANSPORT}}",
+        "security": "{{SECURITY}}",
+        "tlsSettings": {
+          "serverName": "{{SNI}}",
+          "fingerprint": "{{FINGERPRINT}}",
+          "realitySettings": {
+            "publicKey": "{{PUBLIC_KEY}}",
+            "shortId": "{{SHORT_ID}}"
+          }
+        },
+        "kcpSettings": {
+          "seed": "{{KCP_SEED}}"
+        },
+        "xhttpSettings": {
+          "path": "{{XHTTP_PATH}}",
+          "mode": "{{XHTTP_MODE}}"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom",
+      "settings": {}
+    }
+  ],
+  "routing": {
+    "domainStrategy": "IPIfNonMatch",
+    "rules": []
+  }
+}
