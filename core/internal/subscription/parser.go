@@ -143,6 +143,15 @@ func Parse(rawContent []byte) ([]engine.ServerConfig, []ParseError) {
                 return parseClash(payload)
         }
 
+        // Check for raw WireGuard .conf format
+        if strings.HasPrefix(payloadStr, "[Interface]") {
+                cfg, err := ParseWireGuardConf(payloadStr)
+                if err != nil {
+                        return servers, append(errs, ParseError{Message: err.Error()})
+                }
+                return append(servers, cfg), errs
+        }
+
         // Treat as newline-separated share links.
         lines := strings.Split(payloadStr, "\n")
         for i, line := range lines {
@@ -601,6 +610,128 @@ func parseAmneziaWG(raw string) (engine.ServerConfig, error) {
         cfg.AmneziaH4 = parseUint32Q(query, "h4")
 
         return cfg, nil
+}
+
+
+// ---------------------------------------------------------------------------
+// WireGuard .conf parser (raw INI format)
+// ---------------------------------------------------------------------------
+
+// ParseWireGuardConf parses a standard WireGuard .conf file (INI format).
+// It detects AmneziaWG by the presence of junk-packet parameters (Jc, Jmin, etc.)
+// and sets the protocol accordingly.
+func ParseWireGuardConf(text string) (engine.ServerConfig, error) {
+        var cfg engine.ServerConfig
+        cfg.ID = uuid.New().String()
+        cfg.Protocol = engine.ProtocolWireGuard // default; may be upgraded to AmneziaWG
+
+        currentSection := ""
+        lines := strings.Split(text, "\n")
+        hasAmneziaParams := false
+
+        for _, rawLine := range lines {
+                line := strings.TrimSpace(rawLine)
+                if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, ";") {
+                        continue
+                }
+
+                // Section header
+                if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+                        currentSection = strings.ToLower(line[1 : len(line)-1])
+                        continue
+                }
+
+                // Key = Value
+                parts := strings.SplitN(line, "=", 2)
+                if len(parts) != 2 {
+                        continue
+                }
+                key := strings.TrimSpace(parts[0])
+                value := strings.TrimSpace(parts[1])
+
+                switch currentSection {
+                case "interface":
+                        switch strings.ToLower(key) {
+                        case "privatekey":
+                                cfg.WGPrivateKey = value
+                        case "address":
+                                cfg.WGLocalAddress = value
+                        case "dns":
+                                cfg.WGDNSServers = value
+                        case "jc":
+                                cfg.AmneziaJc = parseUint32Simple(value)
+                                hasAmneziaParams = true
+                        case "jmin":
+                                cfg.AmneziaJmin = parseUint32Simple(value)
+                                hasAmneziaParams = true
+                        case "jmax":
+                                cfg.AmneziaJmax = parseUint32Simple(value)
+                                hasAmneziaParams = true
+                        case "s1":
+                                cfg.AmneziaS1 = parseUint32Simple(value)
+                                hasAmneziaParams = true
+                        case "s2":
+                                cfg.AmneziaS2 = parseUint32Simple(value)
+                                hasAmneziaParams = true
+                        case "h1":
+                                cfg.AmneziaH1 = parseUint32Simple(value)
+                                hasAmneziaParams = true
+                        case "h2":
+                                cfg.AmneziaH2 = parseUint32Simple(value)
+                                hasAmneziaParams = true
+                        case "h3":
+                                cfg.AmneziaH3 = parseUint32Simple(value)
+                                hasAmneziaParams = true
+                        case "h4":
+                                cfg.AmneziaH4 = parseUint32Simple(value)
+                                hasAmneziaParams = true
+                        }
+                case "peer":
+                        switch strings.ToLower(key) {
+                        case "publickey":
+                                cfg.WGPublicKey = value
+                        case "presharedkey":
+                                cfg.WGPresharedKey = value
+                        case "allowedips":
+                                cfg.WGAllowedIPs = value
+                        case "persistentkeepalive":
+                                // Parsed but not stored
+                        case "endpoint":
+                                h, p, pErr := netSplitHostPort(value)
+                                if pErr == nil {
+                                        cfg.Host = h
+                                        cfg.Port = p
+                                }
+                        }
+                }
+        }
+
+        if hasAmneziaParams {
+                cfg.Protocol = engine.ProtocolAmneziaWG
+                cfg.AmneziaPrivateKey = cfg.WGPrivateKey
+                cfg.AmneziaPublicKey = cfg.WGPublicKey
+                cfg.AmneziaPresharedKey = cfg.WGPresharedKey
+                cfg.AmneziaLocalAddr = cfg.WGLocalAddress
+                cfg.AmneziaDNS = cfg.WGDNSServers
+        }
+
+        if cfg.Name == "" && cfg.Host != "" {
+                cfg.Name = fmt.Sprintf("WireGuard-%s", cfg.Host)
+                if hasAmneziaParams {
+                        cfg.Name = fmt.Sprintf("AmneziaWG-%s", cfg.Host)
+                }
+        }
+
+        return cfg, nil
+}
+
+// parseUint32Simple parses a string as uint32, returning 0 on failure.
+func parseUint32Simple(s string) uint32 {
+        n, err := strconv.ParseUint(strings.TrimSpace(s), 10, 32)
+        if err != nil {
+                return 0
+        }
+        return uint32(n)
 }
 
 // ---------------------------------------------------------------------------
