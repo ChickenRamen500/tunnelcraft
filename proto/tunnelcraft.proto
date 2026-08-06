@@ -1,0 +1,772 @@
+syntax = "proto3";
+
+package tunnelcraft.v1;
+
+option go_package = "github.com/ChickenRamen500/tunnelcraft/proto/v1;tunnelcraftv1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/empty.proto";
+
+// ============================================================================
+// TunnelCraft VPN Client — gRPC API
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// Enums
+// ----------------------------------------------------------------------------
+
+// Supported VPN protocol families.
+enum Protocol {
+  PROTOCOL_UNSPECIFIED = 0;
+  PROTOCOL_VLESS        = 1;
+  PROTOCOL_VMESS        = 2;
+  PROTOCOL_TROJAN       = 3;
+  PROTOCOL_SHADOWSOCKS  = 4;
+  PROTOCOL_WIREGUARD    = 5;
+  PROTOCOL_HYSTERIA     = 6;
+  PROTOCOL_AMNEZIAWG    = 7;
+  PROTOCOL_SSH          = 8;
+}
+
+// Transport layer used by Xray-family protocols.
+enum Transport {
+  TRANSPORT_UNSPECIFIED = 0;
+  TRANSPORT_TCP         = 1;
+  TRANSPORT_WS          = 2;
+  TRANSPORT_GRPC        = 3;
+  TRANSPORT_KCP         = 4;
+  TRANSPORT_XHTTP       = 5;
+  TRANSPORT_HTTPUPGRADE = 6;
+  TRANSPORT_QUIC        = 7;
+}
+
+// TLS / security mode for Xray-family protocols.
+enum Security {
+  SECURITY_UNSPECIFIED = 0;
+  SECURITY_NONE        = 1;
+  SECURITY_TLS         = 2;
+  SECURITY_REALITY     = 3;
+}
+
+// Connection state of the VPN tunnel.
+enum ConnectionState {
+  CONNECTION_STATE_UNSPECIFIED = 0;
+  CONNECTION_STATE_DISCONNECTED = 1;
+  CONNECTION_STATE_CONNECTING   = 2;
+  CONNECTION_STATE_CONNECTED    = 3;
+  CONNECTION_STATE_RECONNECTING = 4;
+  CONNECTION_STATE_DISCONNECTING = 5;
+  CONNECTION_STATE_ERROR        = 6;
+}
+
+// Log severity level.
+enum LogLevel {
+  LOG_LEVEL_UNSPECIFIED = 0;
+  LOG_LEVEL_DEBUG       = 1;
+  LOG_LEVEL_INFO        = 2;
+  LOG_LEVEL_WARN        = 3;
+  LOG_LEVEL_ERROR       = 4;
+  LOG_LEVEL_FATAL       = 5;
+}
+
+// Proxy mode determines how traffic is routed.
+enum ProxyMode {
+  PROXY_MODE_UNSPECIFIED = 0;
+  PROXY_MODE_SYSTEM      = 1;  // TUN / system-wide proxy
+  PROXY_MODE_SOCKS       = 2;  // Local SOCKS5 only
+  PROXY_MODE_HTTP        = 3;  // Local HTTP proxy only
+  PROXY_MODE_PAC         = 4;  // PAC-based selective routing
+}
+
+// Server health / reachability status.
+enum ServerStatus {
+  SERVER_STATUS_UNSPECIFIED = 0;
+  SERVER_STATUS_ONLINE      = 1;
+  SERVER_STATUS_OFFLINE     = 2;
+  SERVER_STATUS_UNKNOWN     = 3;
+}
+
+// Rule action for routing rules.
+enum RuleAction {
+  RULE_ACTION_UNSPECIFIED = 0;
+  RULE_ACTION_PROXY       = 1;
+  RULE_ACTION_DIRECT      = 2;
+  RULE_ACTION_BLOCK       = 3;
+}
+
+// ----------------------------------------------------------------------------
+// Common / Shared Messages
+// ----------------------------------------------------------------------------
+
+// Generic key-value metadata entry.
+message MetadataEntry {
+  string key   = 1;
+  string value = 2;
+}
+
+// Geographic location of a server.
+message GeoLocation {
+  string country      = 1;
+  string country_code = 2;  // ISO 3166-1 alpha-2
+  string city         = 3;
+  double latitude     = 4;
+  double longitude    = 5;
+  string isp          = 6;
+}
+
+// Bandwidth statistics for a session or server.
+message BandwidthStats {
+  uint64 bytes_uploaded   = 1;
+  uint64 bytes_downloaded = 2;
+  google.protobuf.Timestamp session_start = 3;
+  google.protobuf.Duration  duration      = 4;
+}
+
+// Latency measurement from a speed-test probe.
+message LatencySample {
+  uint32 sequence      = 1;
+  google.protobuf.Duration rtt = 2;
+  bool   timed_out    = 3;
+}
+
+// ----------------------------------------------------------------------------
+// Server Configuration Messages
+// ----------------------------------------------------------------------------
+
+// Xray-specific configuration fields.
+message XrayConfig {
+  string uuid         = 1;
+  string flow         = 2;  // e.g. "xtls-rprx-vision"
+  Security security   = 3;
+  Transport transport = 4;
+  string sni          = 5;
+  string fingerprint  = 6;  // uTLS fingerprint
+  string alpn         = 7;
+  string public_key   = 8;  // Reality public key
+  string short_id     = 9;  // Reality short ID
+  string kcp_seed     = 10;
+  string xhttp_path   = 11;
+  string xhttp_mode   = 12;
+  string ws_path      = 13;
+  string grpc_service = 14;
+  bool   allow_insecure = 15;
+}
+
+// WireGuard-specific configuration fields.
+message WireGuardConfig {
+  string private_key   = 1;
+  string public_key    = 2;
+  string preshared_key = 3;
+  string local_address = 4;  // CIDR, e.g. "10.0.0.2/32"
+  string dns_servers   = 5;  // comma-separated
+  uint32 mtu           = 6;
+  uint32 persistent_keepalive = 7;
+  string allowed_ips   = 8;  // comma-separated CIDRs
+}
+
+// Hysteria-specific configuration fields.
+message HysteriaConfig {
+  string auth_password = 1;
+  string sni           = 2;
+  bool   insecure      = 3;
+  string alpn          = 4;
+  string obfs_password = 5;
+  string protocol      = 6;  // "hysteria1" or "hysteria2"
+  uint64 bandwidth_up  = 7;  // in bps, 0 = unlimited
+  uint64 bandwidth_down = 8;
+  bool   fast_open     = 9;
+}
+
+// Shadowsocks-specific configuration fields.
+message ShadowsocksConfig {
+  string method   = 1;  // e.g. "aes-256-gcm"
+  string password = 2;
+  string plugin   = 3;  // e.g. "obfs-local"
+  string plugin_opts = 4;
+}
+
+// AmneziaWG-specific configuration fields.
+message AmneziaWGConfig {
+  string private_key   = 1;
+  string public_key    = 2;
+  string preshared_key = 3;
+  string local_address = 4;
+  string dns_servers   = 5;
+  uint32 mtu           = 6;
+  string junk_pkt_count     = 7;
+  string junk_pkt_size      = 8;
+  string init_magic_header  = 9;
+}
+
+// SSH tunnel-specific configuration fields.
+message SSHConfig {
+  string username       = 1;
+  string password       = 2;
+  string private_key    = 3;  // PEM content
+  string key_passphrase = 4;
+}
+
+// A remote VPN server entry.
+message Server {
+  string id          = 1;  // client-generated UUID
+  string name        = 2;
+  string host        = 3;
+  uint32 port        = 4;
+  Protocol protocol  = 5;
+
+  oneof protocol_config {
+    XrayConfig      xray       = 10;
+    WireGuardConfig wireguard  = 11;
+    HysteriaConfig  hysteria   = 12;
+    ShadowsocksConfig shadowsocks = 13;
+    AmneziaWGConfig  amneziawg = 14;
+    SSHConfig        ssh       = 15;
+  }
+
+  GeoLocation geo       = 20;
+ ServerStatus status    = 21;
+  bool   favorite       = 22;
+  uint32 sort_order     = 23;
+  repeated string tags  = 24;
+  google.protobuf.Timestamp last_connected = 25;
+  google.protobuf.Timestamp created_at      = 26;
+  google.protobuf.Timestamp updated_at      = 27;
+  string subscription_id = 28;  // link to Subscription
+}
+
+// ----------------------------------------------------------------------------
+// Subscription Messages
+// ----------------------------------------------------------------------------
+
+// A subscription source that provides server lists.
+message Subscription {
+  string id               = 1;
+  string name             = 2;
+  string url              = 3;
+  string username         = 4;
+  string password         = 5;
+  uint32 refresh_interval = 6;  // minutes between auto-refreshes, 0 = manual
+  google.protobuf.Timestamp last_refreshed = 7;
+  int64  server_count     = 8;
+  string filter           = 9;  // keyword filter for imported servers
+  bool   enabled          = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+// ----------------------------------------------------------------------------
+// Routing Rule Messages
+// ----------------------------------------------------------------------------
+
+// A single routing rule.
+message RoutingRule {
+  string id      = 1;
+  string name    = 2;
+  bool   enabled = 3;
+  RuleAction action = 4;
+
+  // Match criteria — at least one must be set.
+  repeated string domains    = 10;  // exact or wildcard domain matches
+  repeated string ip_cidrs     = 11;  // CIDR ranges
+  repeated string geoip_codes = 12;  // ISO 3166-1 alpha-2 country codes
+  repeated string processes    = 13;  // process / app names
+  repeated string ports       = 14;  // port ranges, e.g. "80", "443", "8000-9000"
+  repeated string protocols  = 15;  // "tcp", "udp", "tcp,udp"
+}
+
+// Full routing configuration.
+message RoutingConfig {
+  string   domain_strategy   = 1;  // "AsIs", "IPIfNonMatch", "IPOnDemand"
+  repeated RoutingRule rules = 2;
+}
+
+// ----------------------------------------------------------------------------
+// Global Settings Messages
+// ----------------------------------------------------------------------------
+
+// Application-wide settings.
+message Settings {
+  ProxyMode proxy_mode          = 1;
+  uint32   socks_port           = 2;
+  uint32   http_port            = 3;
+  string   dns_servers          = 4;
+  LogLevel  log_level           = 5;
+  bool     auto_connect         = 6;
+  bool     connect_on_startup   = 7;
+  bool     kill_switch          = 8;
+  bool     split_tunneling      = 9;
+  string   lan_interface        = 10;
+  string   bypass_domain        = 11;  // comma-separated domains to bypass
+  bool     allow_lan            = 12;
+  uint32   connection_timeout   = 13;  // seconds
+  uint32   reconnect_attempts   = 14;
+  uint32   reconnect_delay      = 15;  // seconds
+  bool     telemetry_enabled    = 16;
+  string   language             = 17;  // BCP-47 language tag
+  string   theme                = 18;  // "system", "light", "dark"
+  string   active_server_id     = 19;
+  RoutingConfig routing        = 20;
+}
+
+// ----------------------------------------------------------------------------
+// Service 1: TunnelService — Core VPN lifecycle
+// ----------------------------------------------------------------------------
+
+service TunnelService {
+  // Connect to the specified (or last-used) server.
+  rpc Connect(ConnectRequest) returns (ConnectResponse);
+
+  // Disconnect the active tunnel.
+  rpc Disconnect(DisconnectRequest) returns (DisconnectResponse);
+
+  // Stream real-time connection state changes.
+  rpc WatchConnection(WatchConnectionRequest)
+      returns (stream ConnectionStateEvent);
+
+  // Get the current connection status and session statistics.
+  rpc GetConnectionStatus(GetConnectionStatusRequest)
+      returns (GetConnectionStatusResponse);
+
+  // Reconnect to the current server (or a new one).
+  rpc Reconnect(ReconnectRequest) returns (ReconnectResponse);
+}
+
+message ConnectRequest {
+  string server_id           = 1;  // empty = last used server
+  ProxyMode override_mode    = 2;
+  map<string, string> extra  = 3;  // protocol-specific overrides
+}
+
+message ConnectResponse {
+  ConnectionState state        = 1;
+  string            server_id   = 2;
+  uint32            socks_port  = 3;
+  uint32            http_port   = 4;
+  string            error       = 5;
+  google.protobuf.Timestamp connected_at = 6;
+}
+
+message DisconnectRequest {
+  bool force = 1;  // force-kill even if resources are busy
+}
+
+message DisconnectResponse {
+  ConnectionState state        = 1;
+  BandwidthStats final_stats  = 2;
+  string           error       = 3;
+}
+
+message WatchConnectionRequest {
+  // Empty — subscribes to all state changes for the current session.
+}
+
+message ConnectionStateEvent {
+  ConnectionState       state   = 1;
+  string                message = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  string                error   = 4;  // populated when state == ERROR
+  string                server_id = 5;
+}
+
+message GetConnectionStatusRequest {}
+
+message GetConnectionStatusResponse {
+  ConnectionState       state   = 1;
+  string                server_id = 2;
+  BandwidthStats       stats   = 3;
+  google.protobuf.Timestamp connected_at = 4;
+  ProxyMode             mode    = 5;
+  uint32                socks_port = 6;
+  uint32                http_port  = 7;
+  string                local_ip   = 8;
+}
+
+message ReconnectRequest {
+  string server_id = 1;  // empty = reconnect to current server
+}
+
+message ReconnectResponse {
+  ConnectionState state      = 1;
+  string            server_id = 2;
+  string            error     = 3;
+}
+
+// ----------------------------------------------------------------------------
+// Service 2: ServerService — Server CRUD & management
+// ----------------------------------------------------------------------------
+
+service ServerService {
+  // List all saved servers, optionally filtered.
+  rpc ListServers(ListServersRequest) returns (ListServersResponse);
+
+  // Get a single server by ID.
+  rpc GetServer(GetServerRequest) returns (Server);
+
+  // Add a new server.
+  rpc CreateServer(CreateServerRequest) returns (Server);
+
+  // Update an existing server (supports FieldMask).
+  rpc UpdateServer(UpdateServerRequest) returns (Server);
+
+  // Delete a server.
+  rpc DeleteServer(DeleteServerRequest) returns (google.protobuf.Empty);
+
+  // Test latency and reachability of one or more servers.
+  rpc TestServers(TestServersRequest) returns (stream ServerTestResult);
+
+  // Import servers from a share link or subscription.
+  rpc ImportServers(ImportServersRequest) returns (ImportServersResponse);
+
+  // Export server config as a share link.
+  rpc ExportServer(ExportServerRequest) returns (ExportServerResponse);
+
+  // Ping a single server and stream latency samples.
+  rpc PingServer(PingServerRequest) returns (stream LatencySample);
+}
+
+message ListServersRequest {
+  Protocol protocol    = 1;  // filter by protocol, UNSPECIFIED = all
+  string   tag         = 2;  // filter by tag
+  string   subscription_id = 3;
+  bool     favorites_only  = 4;
+  string   search_query    = 5;  // free-text search on name/host
+}
+
+message ListServersResponse {
+  repeated Server servers = 1;
+  int32           total   = 2;
+}
+
+message GetServerRequest {
+  string id = 1;
+}
+
+message CreateServerRequest {
+  Server server = 1;  // id will be auto-generated if empty
+}
+
+message UpdateServerRequest {
+  Server                 server     = 1;
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message DeleteServerRequest {
+  string id = 1;
+}
+
+message TestServersRequest {
+  repeated string server_ids = 1;
+  uint32 timeout_seconds     = 2;  // per-server test timeout
+}
+
+message ServerTestResult {
+  string  server_id   = 1;
+  bool    reachable   = 2;
+  google.protobuf.Duration latency = 3;
+  string  error       = 4;
+  ServerStatus status = 5;
+}
+
+message ImportServersRequest {
+  string content      = 1;  // raw link text or base64 subscription payload
+  string subscription_id = 2;  // optionally associate with a subscription
+  string group_name   = 3;  // tag/group to assign
+}
+
+message ImportServersResponse {
+  repeated string imported_server_ids = 1;
+  int32  total_parsed     = 2;
+  int32  total_imported   = 3;
+  repeated string errors  = 4;  // per-line parse errors
+}
+
+message ExportServerRequest {
+  string server_id = 1;
+}
+
+message ExportServerResponse {
+  string share_link = 1;
+}
+
+message PingServerRequest {
+  string server_id       = 1;
+  uint32 count          = 2;  // number of pings, default 10
+  google.protobuf.Duration interval = 3;
+}
+
+// ----------------------------------------------------------------------------
+// Service 3: SubscriptionService — Subscription CRUD & refresh
+// ----------------------------------------------------------------------------
+
+service SubscriptionService {
+  rpc ListSubscriptions(ListSubscriptionsRequest)
+      returns (ListSubscriptionsResponse);
+  rpc GetSubscription(GetSubscriptionRequest) returns (Subscription);
+  rpc CreateSubscription(CreateSubscriptionRequest) returns (Subscription);
+  rpc UpdateSubscription(UpdateSubscriptionRequest) returns (Subscription);
+  rpc DeleteSubscription(DeleteSubscriptionRequest)
+      returns (google.protobuf.Empty);
+
+  // Refresh (fetch) servers from a subscription URL.
+  rpc RefreshSubscription(RefreshSubscriptionRequest)
+      returns (RefreshSubscriptionResponse);
+
+  // Stream progress of a long-running refresh.
+  rpc StreamRefresh(StreamRefreshRequest)
+      returns (stream RefreshProgress);
+}
+
+message ListSubscriptionsRequest {}
+
+message ListSubscriptionsResponse {
+  repeated Subscription subscriptions = 1;
+}
+
+message GetSubscriptionRequest {
+  string id = 1;
+}
+
+message CreateSubscriptionRequest {
+  Subscription subscription = 1;
+}
+
+message UpdateSubscriptionRequest {
+  Subscription            subscription  = 1;
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message DeleteSubscriptionRequest {
+  string id = 1;
+}
+
+message RefreshSubscriptionRequest {
+  string id = 1;
+}
+
+message RefreshSubscriptionResponse {
+  Subscription            subscription = 1;
+  repeated string         imported_ids = 2;
+  int32                   added        = 3;
+  int32                   updated      = 4;
+  int32                   removed      = 5;
+}
+
+message StreamRefreshRequest {
+  string id = 1;
+}
+
+message RefreshProgress {
+  float   percent     = 1;
+  string  stage       = 2;  // "fetching", "parsing", "importing", "done"
+  int32   parsed      = 3;
+  int32   imported    = 4;
+  string  error       = 5;
+}
+
+// ----------------------------------------------------------------------------
+// Service 4: SettingsService — Application settings
+// ----------------------------------------------------------------------------
+
+service SettingsService {
+  rpc GetSettings(GetSettingsRequest) returns (Settings);
+  rpc UpdateSettings(UpdateSettingsRequest) returns (Settings);
+  rpc ResetSettings(ResetSettingsRequest) returns (Settings);
+}
+
+message GetSettingsRequest {}
+
+message UpdateSettingsRequest {
+  Settings                settings    = 1;
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message ResetSettingsRequest {}
+
+// ----------------------------------------------------------------------------
+// Service 5: RoutingService — Routing rule management
+// ----------------------------------------------------------------------------
+
+service RoutingService {
+  rpc GetRouting(GetRoutingRequest) returns (RoutingConfig);
+  rpc UpdateRouting(UpdateRoutingRequest) returns (RoutingConfig);
+  rpc ListRules(ListRulesRequest) returns (ListRulesResponse);
+  rpc CreateRule(CreateRuleRequest) returns (RoutingRule);
+  rpc UpdateRule(UpdateRuleRequest) returns (RoutingRule);
+  rpc DeleteRule(DeleteRuleRequest) returns (google.protobuf.Empty);
+  rpc ReorderRules(ReorderRulesRequest) returns (ReorderRulesResponse);
+}
+
+message GetRoutingRequest {}
+
+message UpdateRoutingRequest {
+  RoutingConfig routing = 1;
+}
+
+message ListRulesRequest {
+  RuleAction action = 1;  // optional filter
+}
+
+message ListRulesResponse {
+  repeated RoutingRule rules = 1;
+}
+
+message CreateRuleRequest {
+  RoutingRule rule = 1;
+}
+
+message UpdateRuleRequest {
+  RoutingRule             rule        = 1;
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message DeleteRuleRequest {
+  string id = 1;
+}
+
+message ReorderRulesRequest {
+  // Ordered list of rule IDs from top to bottom.
+  repeated string rule_ids = 1;
+}
+
+message ReorderRulesResponse {
+  repeated RoutingRule rules = 1;
+}
+
+// ----------------------------------------------------------------------------
+// Service 6: DiagnosticsService — Logs, speed tests, health
+// ----------------------------------------------------------------------------
+
+service DiagnosticsService {
+  // Stream log entries in real-time.
+  rpc StreamLogs(StreamLogsRequest) returns (stream LogEntry);
+
+  // Run a download/upload speed test against the active server.
+  rpc SpeedTest(SpeedTestRequest) returns (stream SpeedTestSample);
+
+  // Check the health of the local TunnelCraft daemon.
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+
+  // Get information about the running daemon (version, uptime, etc.).
+  rpc GetDaemonInfo(GetDaemonInfoRequest) returns (DaemonInfo);
+
+  // Generate a diagnostic report bundle.
+  rpc GenerateReport(GenerateReportRequest) returns (GenerateReportResponse);
+}
+
+message StreamLogsRequest {
+  LogLevel min_level = 1;  // only stream entries >= this level
+  string   filter    = 2;  // substring / regex filter
+  bool     tail      = 3;  // start from end of buffer
+}
+
+message LogEntry {
+  google.protobuf.Timestamp timestamp = 1;
+  LogLevel  level       = 2;
+  string    component   = 3;  // e.g. "tunnel", "dns", "core"
+  string    message     = 4;
+  repeated MetadataEntry fields = 5;
+}
+
+message SpeedTestRequest {
+  uint32 duration_seconds = 1;  // test duration per phase
+  uint32 parallel        = 2;  // concurrent connections
+  string server_id       = 3;  // empty = use active connection
+}
+
+message SpeedTestSample {
+  string   phase           = 1;  // "download", "upload", "latency"
+  float    bytes_per_sec   = 2;
+  uint64   total_bytes     = 3;
+  uint32   elapsed_ms      = 4;
+  bool     complete        = 5;
+  SpeedTestResult final_result = 6;  // populated on last sample
+}
+
+message SpeedTestResult {
+  float download_mbps = 1;
+  float upload_mbps   = 2;
+  float latency_ms    = 3;
+  float jitter_ms     = 4;
+  float packet_loss   = 5;  // 0.0 – 100.0
+}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  bool    healthy      = 1;
+  string  version      = 2;
+  google.protobuf.Timestamp checked_at = 3;
+  repeated string checks = 4;  // individual check results
+}
+
+message GetDaemonInfoRequest {}
+
+message DaemonInfo {
+  string   version           = 1;
+  string   go_version        = 2;
+  string   os                = 3;
+  string   arch              = 4;
+  google.protobuf.Duration uptime = 5;
+  uint32   goroutine_count   = 6;
+  uint64   memory_alloc_bytes = 7;
+  uint64   memory_sys_bytes   = 8;
+  uint32   active_connections = 9;
+  string   binary_path       = 10;
+  string   config_path       = 11;
+  string   data_dir          = 12;
+  string   pid               = 13;
+  google.protobuf.Timestamp started_at = 14;
+}
+
+message GenerateReportRequest {
+  bool include_logs    = 1;
+  bool include_config  = 2;
+  bool include_stats   = 3;
+}
+
+message GenerateReportResponse {
+  bytes  report_zip = 1;  // zipped diagnostic bundle
+  string filename   = 2;
+}
+
+// ----------------------------------------------------------------------------
+// Service 7: BackupService — Import/Export full state
+// ----------------------------------------------------------------------------
+
+service BackupService {
+  // Export the entire application state as a portable bundle.
+  rpc ExportBackup(ExportBackupRequest) returns (ExportBackupResponse);
+
+  // Import a previously exported backup bundle.
+  rpc ImportBackup(ImportBackupRequest) returns (ImportBackupResponse);
+}
+
+message ExportBackupRequest {
+  bool include_servers      = 1;
+  bool include_subscriptions = 2;
+  bool include_settings      = 3;
+  bool include_routing       = 4;
+  bool encrypt              = 5;
+  string passphrase         = 6;  // required if encrypt == true
+}
+
+message ExportBackupResponse {
+  bytes  data     = 1;  // JSON or encrypted payload
+  string filename = 2;
+}
+
+message ImportBackupRequest {
+  bytes  data       = 1;
+  string passphrase = 2;
+  bool   merge      = 3;  // true = merge, false = replace
+}
+
+message ImportBackupResponse {
+  int32  servers_imported      = 1;
+  int32  subscriptions_imported = 2;
+  bool   settings_applied       = 3;
+  bool   routing_applied        = 4;
+  repeated string warnings      = 5;
+}
