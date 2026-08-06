@@ -123,6 +123,18 @@ func Parse(rawContent []byte) ([]engine.ServerConfig, []ParseError) {
 
         payloadStr := strings.TrimSpace(string(payload))
 
+        // Check for raw WireGuard .conf format FIRST (before JSON check)
+        // because [Interface] looks like a JSON array to isJSON()
+        trimmedPayload := strings.TrimSpace(payloadStr)
+        trimmedPayload = strings.TrimPrefix(trimmedPayload, "ï»¿") // UTF-8 BOM
+        if strings.HasPrefix(trimmedPayload, "[Interface]") {
+                cfg, err := ParseWireGuardConf(trimmedPayload)
+                if err != nil {
+                        return servers, append(errs, ParseError{Message: err.Error()})
+                }
+                return append(servers, cfg), errs
+        }
+
         // ---- Route to the correct sub-parser. ----
 
         // JSON takes priority over YAML since JSON is a subset of YAML and
@@ -143,16 +155,7 @@ func Parse(rawContent []byte) ([]engine.ServerConfig, []ParseError) {
                 return parseClash(payload)
         }
 
-        // Check for raw WireGuard .conf format (trim whitespace/BOM for robustness)
-        trimmedPayload := strings.TrimSpace(payloadStr)
-        trimmedPayload = strings.TrimPrefix(trimmedPayload, "ï»¿") // UTF-8 BOM
-        if strings.HasPrefix(trimmedPayload, "[Interface]") {
-                cfg, err := ParseWireGuardConf(trimmedPayload)
-                if err != nil {
-                        return servers, append(errs, ParseError{Message: err.Error()})
-                }
-                return append(servers, cfg), errs
-        }
+
 
         // Treat as newline-separated share links.
         lines := strings.Split(payloadStr, "\n")
