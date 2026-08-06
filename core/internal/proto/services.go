@@ -14,13 +14,55 @@ import (
 // ============================================================================
 
 var (
-	TunnelService_ServiceDesc      = grpc.ServiceDesc{ServiceName: "tunnelcraft.v1.TunnelService"}
-	ServerService_ServiceDesc      = grpc.ServiceDesc{ServiceName: "tunnelcraft.v1.ServerService"}
-	SubscriptionService_ServiceDesc = grpc.ServiceDesc{ServiceName: "tunnelcraft.v1.SubscriptionService"}
-	SettingsService_ServiceDesc     = grpc.ServiceDesc{ServiceName: "tunnelcraft.v1.SettingsService"}
-	RoutingService_ServiceDesc     = grpc.ServiceDesc{ServiceName: "tunnelcraft.v1.RoutingService"}
-	DiagnosticsService_ServiceDesc = grpc.ServiceDesc{ServiceName: "tunnelcraft.v1.DiagnosticsService"}
-	BackupService_ServiceDesc      = grpc.ServiceDesc{ServiceName: "tunnelcraft.v1.BackupService"}
+    TunnelService_ServiceDesc = grpc.ServiceDesc{
+        ServiceName: "tunnelcraft.v1.TunnelService",
+        HandlerType: (*TunnelServiceServer)(nil),
+        Methods:     []grpc.MethodDesc{},
+        Streams:     []grpc.StreamDesc{},
+        Metadata:    "proto/tunnelcraft.proto",
+    }
+    ServerService_ServiceDesc = grpc.ServiceDesc{
+        ServiceName: "tunnelcraft.v1.ServerService",
+        HandlerType: (*ServerServiceServer)(nil),
+        Methods:     []grpc.MethodDesc{},
+        Streams:     []grpc.StreamDesc{},
+        Metadata:    "proto/tunnelcraft.proto",
+    }
+    SubscriptionService_ServiceDesc = grpc.ServiceDesc{
+        ServiceName: "tunnelcraft.v1.SubscriptionService",
+        HandlerType: (*SubscriptionServiceServer)(nil),
+        Methods:     []grpc.MethodDesc{},
+        Streams:     []grpc.StreamDesc{},
+        Metadata:    "proto/tunnelcraft.proto",
+    }
+    SettingsService_ServiceDesc = grpc.ServiceDesc{
+        ServiceName: "tunnelcraft.v1.SettingsService",
+        HandlerType: (*SettingsServiceServer)(nil),
+        Methods:     []grpc.MethodDesc{},
+        Streams:     []grpc.StreamDesc{},
+        Metadata:    "proto/tunnelcraft.proto",
+    }
+    RoutingService_ServiceDesc = grpc.ServiceDesc{
+        ServiceName: "tunnelcraft.v1.RoutingService",
+        HandlerType: (*RoutingServiceServer)(nil),
+        Methods:     []grpc.MethodDesc{},
+        Streams:     []grpc.StreamDesc{},
+        Metadata:    "proto/tunnelcraft.proto",
+    }
+    DiagnosticsService_ServiceDesc = grpc.ServiceDesc{
+        ServiceName: "tunnelcraft.v1.DiagnosticsService",
+        HandlerType: (*DiagnosticsServiceServer)(nil),
+        Methods:     []grpc.MethodDesc{},
+        Streams:     []grpc.StreamDesc{},
+        Metadata:    "proto/tunnelcraft.proto",
+    }
+    BackupService_ServiceDesc = grpc.ServiceDesc{
+        ServiceName: "tunnelcraft.v1.BackupService",
+        HandlerType: (*BackupServiceServer)(nil),
+        Methods:     []grpc.MethodDesc{},
+        Streams:     []grpc.StreamDesc{},
+        Metadata:    "proto/tunnelcraft.proto",
+    }
 )
 
 // ============================================================================
