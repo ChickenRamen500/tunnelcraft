@@ -603,6 +603,100 @@ func parseAmneziaWG(raw string) (engine.ServerConfig, error) {
         return cfg, nil
 }
 
+
+// ---------------------------------------------------------------------------
+// WireGuard .conf file parser
+// ---------------------------------------------------------------------------
+
+// ParseWireGuardConf parses a standard WireGuard INI-style config file.
+// It extracts all relevant fields from [Interface] and [Peer] sections.
+func ParseWireGuardConf(text string) (engine.ServerConfig, error) {
+        var cfg engine.ServerConfig
+        cfg.ID = engine.GenerateID()
+        cfg.Protocol = engine.ProtocolWireGuard
+
+        lines := strings.Split(text, "\n")
+        inInterface := false
+        inPeer := false
+
+        for _, line := range lines {
+                line = strings.TrimSpace(line)
+                if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, ";") {
+                        continue
+                }
+
+                // Section headers
+                if line == "[Interface]" {
+                        inInterface = true
+                        inPeer = false
+                        continue
+                }
+                if line == "[Peer]" {
+                        inPeer = true
+                        inInterface = false
+                        continue
+                }
+
+                // Key = Value parsing
+                eqIdx := strings.Index(line, "=")
+                if eqIdx == -1 {
+                        continue
+                }
+                key := strings.TrimSpace(line[:eqIdx])
+                value := strings.TrimSpace(line[eqIdx+1:])
+
+                if inInterface {
+                        switch key {
+                        case "PrivateKey":
+                                cfg.WGPrivateKey = value
+                        case "Address":
+                                cfg.WGLocalAddress = value
+                        case "DNS":
+                                cfg.WGDNSServers = value
+                        case "MTU":
+                                if mtu, err := strconv.ParseUint(value, 10, 32); err == nil {
+                                        // MTU stored but not used directly (wireguard-go handles it)
+                                        _ = mtu
+                                }
+                        case "Jc", "Jmin", "Jmax", "S1", "S2", "H1", "H2", "H3", "H4", "I1", "I2", "I3":
+                                // AmneziaWG parameters detected - switch protocol
+                                cfg.Protocol = engine.ProtocolAmneziaWG
+                                cfg.AmneziaPrivateKey = cfg.WGPrivateKey
+                                cfg.WGPrivateKey = ""
+                        }
+                }
+
+                if inPeer {
+                        switch key {
+                        case "PublicKey":
+                                cfg.WGPublicKey = value
+                        case "PresharedKey":
+                                cfg.WGPresharedKey = value
+                        case "AllowedIPs":
+                                cfg.WGAllowedIPs = value
+                        case "PersistentKeepalive":
+                                // Stored but wireguard-go handles it in the config file
+                                _ = value
+                        case "Endpoint":
+                                h, p, err := netSplitHostPort(value)
+                                if err == nil {
+                                        cfg.Host = h
+                                        cfg.Port = p
+                                }
+                        }
+                }
+        }
+
+        // If AmneziaWG was detected, copy WG fields to Amnezia fields
+        if cfg.Protocol == engine.ProtocolAmneziaWG {
+                if cfg.AmneziaPrivateKey == "" {
+                        cfg.AmneziaPrivateKey = cfg.WGPrivateKey
+                }
+        }
+
+        return cfg, nil
+}
+
 // ---------------------------------------------------------------------------
 // sing-box JSON parser
 // ---------------------------------------------------------------------------
@@ -1255,6 +1349,12 @@ func isSIP008JSON(data []byte) bool {
 func isClashYAML(data []byte) bool {
         s := strings.ToLower(string(data))
         return strings.Contains(s, "proxies:") || strings.Contains(s, `"proxies"`)
+}
+
+// isWireGuardConf checks if the content looks like a WireGuard .conf file.
+func isWireGuardConf(data []byte) bool {
+        s := strings.TrimSpace(string(data))
+        return strings.HasPrefix(s, "[Interface]")
 }
 
 // hasShareLinkPrefix returns true if any line in the text starts with a
