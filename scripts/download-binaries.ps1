@@ -10,7 +10,7 @@ Write-Host "=== TunnelCraft Binary Downloader ===" -ForegroundColor Cyan
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 1. xray-core.exe  â€” GitHub releases (WORKS)
+# 1. xray-core.exe  — GitHub releases (WORKS)
 # ------------------------------------------------------------------
 Write-Host "[1/4] xray-core.exe" -ForegroundColor Yellow
 try {
@@ -35,7 +35,7 @@ try {
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 2. hysteria.exe  â€” GitHub releases (WORKS)
+# 2. hysteria.exe  — GitHub releases (WORKS)
 # ------------------------------------------------------------------
 Write-Host "[2/4] hysteria.exe" -ForegroundColor Yellow
 try {
@@ -60,7 +60,7 @@ try {
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 3. wintun.dll  â€” wintun.net (WORKS)
+# 3. wintun.dll  — wintun.net (WORKS)
 # ------------------------------------------------------------------
 Write-Host "[3/4] wintun.dll" -ForegroundColor Yellow
 try {
@@ -85,7 +85,7 @@ try {
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 4. wireguard-go.exe  â€” extracted from WireGuard for Windows installer
+# 4. wireguard-go.exe  — extracted from WireGuard for Windows installer
 #    The WireGuard repo has NO releases. We download the official MSI
 #    and extract wireguard-go.exe from it.
 # ------------------------------------------------------------------
@@ -147,11 +147,11 @@ if (-not (Test-Path $wgExe)) {
 Write-Host ""
 
 # ------------------------------------------------------------------
-# amnezia-wg.exe â€” SKIPPED (no pre-built binary exists)
+# amnezia-wg.exe — SKIPPED (no pre-built binary exists)
 # amnezia-wg is a Go library, not a standalone CLI tool.
 # It will be integrated directly into tunnelcraftd via go get.
 # ------------------------------------------------------------------
-Write-Host "[SKIP] amnezia-wg.exe â€” will be integrated as Go library later" -ForegroundColor DarkGray
+Write-Host "[SKIP] amnezia-wg.exe — will be integrated as Go library later" -ForegroundColor DarkGray
 Write-Host ""
 
 # ------------------------------------------------------------------
