@@ -369,7 +369,22 @@ func configEntryToServer(e config.ServerEntry) *ServerConfig {
                 s.HysteriaBwDown = e.HysteriaConfig.BandwidthDown
                 s.HysteriaFastOpen = e.HysteriaConfig.FastOpen
         }
-        // TODO: AmneziaWG config conversion
+        if e.AmneziaConfig != nil {
+                s.AmneziaPrivateKey = e.AmneziaConfig.PrivateKey
+                s.AmneziaPublicKey = e.AmneziaConfig.PublicKey
+                s.AmneziaPresharedKey = e.AmneziaConfig.PresharedKey
+                s.AmneziaLocalAddr = e.AmneziaConfig.LocalAddress
+                s.AmneziaDNS = e.AmneziaConfig.DNSServers
+                s.AmneziaJc = e.AmneziaConfig.Jc
+                s.AmneziaJmin = e.AmneziaConfig.Jmin
+                s.AmneziaJmax = e.AmneziaConfig.Jmax
+                s.AmneziaS1 = e.AmneziaConfig.S1
+                s.AmneziaS2 = e.AmneziaConfig.S2
+                s.AmneziaH1 = e.AmneziaConfig.H1
+                s.AmneziaH2 = e.AmneziaConfig.H2
+                s.AmneziaH3 = e.AmneziaConfig.H3
+                s.AmneziaH4 = e.AmneziaConfig.H4
+        }
         return s
 }
 
