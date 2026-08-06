@@ -145,7 +145,7 @@ func Parse(rawContent []byte) ([]engine.ServerConfig, []ParseError) {
 
         // Check for raw WireGuard .conf format (trim whitespace/BOM for robustness)
         trimmedPayload := strings.TrimSpace(payloadStr)
-        trimmedPayload = strings.TrimPrefix(trimmedPayload, "\xef\xbb\xbf") // UTF-8 BOM
+        trimmedPayload = strings.TrimPrefix(trimmedPayload, "ï»¿") // UTF-8 BOM
         if strings.HasPrefix(trimmedPayload, "[Interface]") {
                 cfg, err := ParseWireGuardConf(trimmedPayload)
                 if err != nil {
