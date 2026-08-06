@@ -10,9 +10,9 @@ Write-Host "=== TunnelCraft Binary Downloader ===" -ForegroundColor Cyan
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 1. xray-core.exe  — GitHub releases (WORKS)
+# 1. xray-core.exe  â€” GitHub releases (WORKS)
 # ------------------------------------------------------------------
-Write-Host "[1/4] xray-core.exe" -ForegroundColor Yellow
+Write-Host "[1/5] xray-core.exe" -ForegroundColor Yellow
 try {
     $tmp = Join-Path $env:TEMP "tunnelcraft-xray.zip"
     Invoke-WebRequest -Uri "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-windows-64.zip" -OutFile $tmp -UseBasicParsing
@@ -35,9 +35,9 @@ try {
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 2. hysteria.exe  — GitHub releases (standalone exe, not zip)
+# 2. hysteria.exe  â€” GitHub releases (standalone exe, not zip)
 # ------------------------------------------------------------------
-Write-Host "[2/4] hysteria.exe" -ForegroundColor Yellow
+Write-Host "[2/5] hysteria.exe" -ForegroundColor Yellow
 try {
     Invoke-WebRequest -Uri "https://github.com/apernet/hysteria/releases/latest/download/hysteria-windows-amd64.exe" -OutFile (Join-Path $BinDir "hysteria.exe") -UseBasicParsing
     $sz = [math]::Round((Get-Item (Join-Path $BinDir "hysteria.exe")).Length / 1MB, 2)
@@ -48,9 +48,9 @@ try {
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 3. wintun.dll  — wintun.net (WORKS)
+# 3. wintun.dll  â€” wintun.net (WORKS)
 # ------------------------------------------------------------------
-Write-Host "[3/4] wintun.dll" -ForegroundColor Yellow
+Write-Host "[3/5] wintun.dll" -ForegroundColor Yellow
 try {
     $tmp = Join-Path $env:TEMP "tunnelcraft-wintun.zip"
     Invoke-WebRequest -Uri "https://www.wintun.net/builds/wintun-0.14.1.zip" -OutFile $tmp -UseBasicParsing
@@ -73,11 +73,11 @@ try {
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 4. wireguard-go.exe  — extracted from WireGuard for Windows installer
+# 4. wireguard-go.exe  â€” extracted from WireGuard for Windows installer
 #    The WireGuard repo has NO releases. We download the official MSI
 #    and extract wireguard-go.exe from it.
 # ------------------------------------------------------------------
-Write-Host "[4/4] wireguard-go.exe" -ForegroundColor Yellow
+Write-Host "[4/5] wireguard-go.exe" -ForegroundColor Yellow
 $wgExe = Join-Path $BinDir "wireguard-go.exe"
 
 # Check if already installed on system
@@ -129,19 +129,68 @@ if (-not $found) {
     }
 }
 
+# Try building from source if Go is available
+if (-not (Test-Path $wgExe)) {
+    $goCmd = Get-Command go -ErrorAction SilentlyContinue
+    if ($goCmd) {
+        Write-Host "  Attempting to build wireguard-go from source..." -ForegroundColor DarkGray
+        try {
+            $env:GOOS = "windows"
+            $env:GOARCH = "amd64"
+            & go install golang.zx2c4.com/wireguard/cmd/wireguard-go@latest 2>&1 | Out-Null
+            $goPath = (& go env GOPATH 2>$null)
+            if ($goPath) {
+                $builtExe = Join-Path $goPath "bin\wireguard-go.exe"
+                if (Test-Path $builtExe) {
+                    Copy-Item $builtExe $wgExe -Force
+                    $sz = [math]::Round((Get-Item $wgExe).Length / 1MB, 2)
+                    Write-Host "  [OK] wireguard-go.exe built from source ($sz MB)" -ForegroundColor Green
+                    $found = $true
+                }
+            }
+        } catch {
+            Write-Host "  [WARN] go build failed: $($_.Exception.Message)" -ForegroundColor DarkYellow
+        }
+    }
+}
+
 if (-not (Test-Path $wgExe)) {
     Write-Host "  [SKIP] wireguard-go.exe not available. WG/AWG won't work yet." -ForegroundColor DarkYellow
     Write-Host "         Fix: Install WireGuard from https://www.wireguard.com/install/" -ForegroundColor DarkYellow
+    Write-Host "         or:  go install golang.zx2c4.com/wireguard/cmd/wireguard-go@latest" -ForegroundColor DarkYellow
     Write-Host "         then re-run this script." -ForegroundColor DarkYellow
 }
 Write-Host ""
 
 # ------------------------------------------------------------------
-# amnezia-wg.exe — SKIPPED (no pre-built binary exists)
-# amnezia-wg is a Go library, not a standalone CLI tool.
-# It will be integrated directly into tunnelcraftd via go get.
+# 5. amnezia-wg.exe â€” build from source if Go available
+#    AmneziaWG is a WireGuard fork; its CLI is similar to wireguard-go.
 # ------------------------------------------------------------------
-Write-Host "[SKIP] amnezia-wg.exe — will be integrated as Go library later" -ForegroundColor DarkGray
+Write-Host "[5/5] amnezia-wg.exe" -ForegroundColor Yellow
+$awgExe = Join-Path $BinDir "amnezia-wg.exe"
+$goCmd = Get-Command go -ErrorAction SilentlyContinue
+if ($goCmd) {
+    try {
+        $env:GOOS = "windows"
+        $env:GOARCH = "amd64"
+        & go install github.com/amnezia-vpn/amnezia-wg/cmd/amnezia-wg@latest 2>&1 | Out-Null
+        $goPath = (& go env GOPATH 2>$null)
+        if ($goPath) {
+            $builtExe = Join-Path $goPath "bin\amnezia-wg.exe"
+            if (Test-Path $builtExe) {
+                Copy-Item $builtExe $awgExe -Force
+                $sz = [math]::Round((Get-Item $awgExe).Length / 1MB, 2)
+                Write-Host "  [OK] amnezia-wg.exe built from source ($sz MB)" -ForegroundColor Green
+            } else {
+                Write-Host "  [WARN] amnezia-wg build produced no binary" -ForegroundColor DarkYellow
+            }
+        }
+    } catch {
+        Write-Host "  [WARN] amnezia-wg build failed: $($_.Exception.Message)" -ForegroundColor DarkYellow
+    }
+} else {
+    Write-Host "  [SKIP] amnezia-wg.exe â€” Go not found, cannot build from source" -ForegroundColor DarkYellow
+}
 Write-Host ""
 
 # ------------------------------------------------------------------

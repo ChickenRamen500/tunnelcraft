@@ -143,6 +143,15 @@ func Parse(rawContent []byte) ([]engine.ServerConfig, []ParseError) {
                 return parseClash(payload)
         }
 
+        // Check for raw WireGuard .conf format
+        if strings.HasPrefix(payloadStr, "[Interface]") {
+                cfg, err := ParseWireGuardConf(payloadStr)
+                if err != nil {
+                        return servers, append(errs, ParseError{Message: err.Error()})
+                }
+                return append(servers, cfg), errs
+        }
+
         // Treat as newline-separated share links.
         lines := strings.Split(payloadStr, "\n")
         for i, line := range lines {
