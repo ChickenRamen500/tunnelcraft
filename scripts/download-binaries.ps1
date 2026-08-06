@@ -35,25 +35,13 @@ try {
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 2. hysteria.exe  — GitHub releases (WORKS)
+# 2. hysteria.exe  — GitHub releases (standalone exe, not zip)
 # ------------------------------------------------------------------
 Write-Host "[2/4] hysteria.exe" -ForegroundColor Yellow
 try {
-    $tmp = Join-Path $env:TEMP "tunnelcraft-hysteria.zip"
-    Invoke-WebRequest -Uri "https://github.com/apernet/hysteria/releases/latest/download/hysteria-windows-amd64.zip" -OutFile $tmp -UseBasicParsing
-    $ext = Join-Path $env:TEMP "tunnelcraft-hysteria"
-    if (Test-Path $ext) { Remove-Item -Recurse -Force $ext }
-    Expand-Archive -Path $tmp -DestinationPath $ext -Force
-    $exe = Get-ChildItem -Path $ext -Filter "hysteria*.exe" -Recurse | Select-Object -First 1
-    if ($exe) {
-        Copy-Item $exe.FullName (Join-Path $BinDir "hysteria.exe") -Force
-        $sz = [math]::Round((Get-Item (Join-Path $BinDir "hysteria.exe")).Length / 1MB, 2)
-        Write-Host "  [OK] hysteria.exe ($sz MB)" -ForegroundColor Green
-    } else {
-        Write-Host "  [WARN] hysteria exe not found inside zip" -ForegroundColor Red
-    }
-    Remove-Item -Recurse -Force $ext
-    Remove-Item -Force $tmp
+    Invoke-WebRequest -Uri "https://github.com/apernet/hysteria/releases/latest/download/hysteria-windows-amd64.exe" -OutFile (Join-Path $BinDir "hysteria.exe") -UseBasicParsing
+    $sz = [math]::Round((Get-Item (Join-Path $BinDir "hysteria.exe")).Length / 1MB, 2)
+    Write-Host "  [OK] hysteria.exe ($sz MB)" -ForegroundColor Green
 } catch {
     Write-Host "  [FAIL] $($_.Exception.Message)" -ForegroundColor Red
 }
@@ -93,9 +81,11 @@ Write-Host "[4/4] wireguard-go.exe" -ForegroundColor Yellow
 $wgExe = Join-Path $BinDir "wireguard-go.exe"
 
 # Check if already installed on system
-$wgSystemPaths = @(
+ $wgSystemPaths = @(
     "C:\Program Files\WireGuard\wireguard-go.exe",
-    "C:\Program Files (x86)\WireGuard\wireguard-go.exe"
+    "C:\Program Files\WireGuard\wg.exe",
+    "C:\Program Files (x86)\WireGuard\wireguard-go.exe",
+    "C:\Program Files (x86)\WireGuard\wg.exe"
 )
 $found = $false
 foreach ($p in $wgSystemPaths) {
