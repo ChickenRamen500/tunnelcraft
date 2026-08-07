@@ -64,3 +64,6 @@ htmlcov/
 ```
 wg-import.json
 bin/data/config.yaml
+core/cmd/test-connect/main.go
+core/cmd/test-import/main.go
+wireguard-go/

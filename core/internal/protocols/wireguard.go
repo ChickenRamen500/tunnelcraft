@@ -39,7 +39,7 @@ func (w *WireGuardHandler) Start(ctx context.Context, server *engine.ServerConfi
 	// wireguard-go uses TUN interface directly
 	// It creates a tun adapter and configures it
 	tunName := "TunnelCraft-WG"
-	args := []string{tunName, "-f", cfgPath}
+	args := []string{tunName}
 
 	if err := w.launchProcess(ctx, args, cfgPath); err != nil {
 		return err

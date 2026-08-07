@@ -93,7 +93,7 @@ func (m *Manager) Connect(ctx context.Context, serverID string) error {
                 return fmt.Errorf("already connected or connecting")
         }
 
-        m.setState(StateConnecting)
+        m.state = StateConnecting
         m.mu.Unlock()
 
         m.emit(ConnectionEvent{
@@ -114,7 +114,7 @@ func (m *Manager) Connect(ctx context.Context, serverID string) error {
         }
 
         // Create cancellable context
-        ctx, cancel := context.WithCancel(ctx)
+        ctx, cancel := context.WithCancel(context.Background())
         m.cancelFunc = cancel
 
         // Get ports from config
