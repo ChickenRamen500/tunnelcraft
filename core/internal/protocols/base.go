@@ -1,4 +1,4 @@
-package protocols
+﻿package protocols
 
 import (
 	"context"
@@ -159,7 +159,7 @@ func (b *BaseHandler) readLogs(pipe interface{ Read([]byte) (int, error) }, pref
 	for {
 		n, err := pipe.Read(buf)
 		if n > 0 {
-			line := fmt.Sprintf("[%s] %s", prefix, string(buf[:n]))
+			line := fmt.Sprintf("[%s] %s", prefix, string(buf[:n]))`n`t`t`t`tfmt.Fprintf(os.Stderr, "[%s] [%s] %s", b.name, prefix, string(buf[:n]))
 			b.mu.Lock()
 			if len(b.logBuffer) >= b.maxLogs {
 				b.logBuffer = b.logBuffer[len(b.logBuffer)/2:]

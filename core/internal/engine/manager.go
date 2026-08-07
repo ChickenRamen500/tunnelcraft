@@ -1,4 +1,4 @@
-package engine
+﻿package engine
 
 import (
         "context"
@@ -151,7 +151,7 @@ func (m *Manager) Connect(ctx context.Context, serverID string) error {
         // Setup TUN and routing
         if m.tunnel != nil {
                 if err := m.tunnel.Setup(socksPort, httpPort, server); err != nil {
-                        // TUN setup failed — stop the protocol
+                        // TUN setup failed вЂ” stop the protocol
                         handler.Stop()
                         cancel()
                         m.setState(StateError)
@@ -303,7 +303,7 @@ func (m *Manager) findServer(id string) *ServerConfig {
         return nil
 }
 
-// TODO: implement createHandler — dispatches to the correct protocol wrapper
+// TODO: implement createHandler вЂ” dispatches to the correct protocol wrapper
 func (m *Manager) createHandler(p Protocol) (ProtocolHandler, error) {
         if m.protoHandlers != nil {
                 if h, ok := m.protoHandlers[p]; ok {
