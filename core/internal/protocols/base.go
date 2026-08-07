@@ -122,6 +122,10 @@ func (b *BaseHandler) launchProcess(ctx context.Context, args []string, configPa
 	ctx, cancel := context.WithCancel(ctx)
 	b.cancel = cancel
 
+		absBin, absErr := filepath.Abs(b.binPath)
+	if absErr == nil {
+		b.binPath = absBin
+	}
 	b.cmd = exec.CommandContext(ctx, b.binPath, args...)
 	b.cmd.Dir = filepath.Dir(configPath)
 
