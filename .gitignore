@@ -40,3 +40,6 @@ target/
 .DS_Store
 Thumbs.db
 ```
+/wireguard-go
+core/cmd/test-connect/main.go
+core/cmd/test-import/main.go
