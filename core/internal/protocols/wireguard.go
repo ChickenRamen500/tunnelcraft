@@ -3,6 +3,7 @@
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,15 +25,20 @@ func NewWireGuardHandler(binPath string) *WireGuardHandler {
 
 // Start generates a WireGuard config and launches wireguard-go.exe.
 func (w *WireGuardHandler) Start(ctx context.Context, server *engine.ServerConfig, socksPort, httpPort uint32) error {
+	log.Printf("[wireguard] >>> Start() entered, server=%s, protocol=%v", server.ID, server.Protocol)
+
 	if w.IsRunning() {
 		return fmt.Errorf("wireguard: already running")
 	}
 
 	// Generate config
+	log.Printf("[wireguard] Generating config...")
 	cfgPath, err := w.generateConfig(server, socksPort)
 	if err != nil {
+		log.Printf("[wireguard] generateConfig FAILED: %v", err)
 		return fmt.Errorf("wireguard: failed to generate config: %w", err)
 	}
+	log.Printf("[wireguard] Config generated: %s", cfgPath)
 
 	w.appendLog("[wireguard] starting wireguard-go with config: %s", cfgPath)
 
@@ -41,9 +47,12 @@ func (w *WireGuardHandler) Start(ctx context.Context, server *engine.ServerConfi
 	tunName := "TunnelCraft-WG"
 	args := []string{tunName}
 
+	log.Printf("[wireguard] About to launch process with args: %v", args)
 	if err := w.launchProcess(ctx, args, cfgPath); err != nil {
+		log.Printf("[wireguard] launchProcess FAILED: %v", err)
 		return err
 	}
+	log.Printf("[wireguard] >>> Process launched successfully, PID=%d", w.cmd.Process.Pid)
 
 	w.appendLog("[wireguard] process started (PID: %d), TUN: %s", w.cmd.Process.Pid, tunName)
 	return nil
@@ -81,11 +90,9 @@ func (w *WireGuardHandler) generateConfig(server *engine.ServerConfig, socksPort
 	// Write to temp file
 	configDir := os.TempDir()
 	configPath := filepath.Join(configDir, fmt.Sprintf("tunnelcraft-wg-%s.conf", server.ID))
-
 	if err := os.WriteFile(configPath, []byte(sb.String()), 0600); err != nil {
 		return "", fmt.Errorf("failed to write wg config: %w", err)
 	}
-
 	return configPath, nil
 }
 
