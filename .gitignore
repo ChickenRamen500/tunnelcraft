@@ -1,25 +1,11 @@
 ```
-# Go-specific ignores
+# Compiled and binary files
 *.o
-*.a
-*.so
-*.dylib
-*.dll
-*.exe
+*.obj
 *.out
-*.test
-*.prof
-cover.out
-coverage.txt
 
 # Dependencies
 vendor/
-Godeps/
-
-# Build artifacts
-bin/
-pkg/
-target/
 
 # Logs and temp files
 *.log
@@ -28,15 +14,25 @@ target/
 # Environment
 .env
 .env.local
-.env.*
+*.env.*
 
-# Editors
+# Coverage
+.coverage
+coverage/
+htmlcov/
+
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# OS generated files
-.DS_Store
-Thumbs.db
+# Build artifacts
+dist/
+build/
+target/
+*.exe
+*.dll
+*.so
+*.a
 ```

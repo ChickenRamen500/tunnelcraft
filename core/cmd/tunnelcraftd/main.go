@@ -8,6 +8,7 @@ import (
         "log"
         "os"
         "path/filepath"
+        "strings"
         "time"
 
         "github.com/ChickenRamen500/tunnelcraft/core/internal/config"
@@ -75,11 +76,28 @@ func main() {
         // --- Initialize subsystems ---
         ctx := context.Background()
 
+        // Determine path to wireguard.exe
+        // Default: C:\Program Files\WireGuard\wireguard.exe
+        wireguardExePath := `C:\Program Files\WireGuard\wireguard.exe`
+        if _, err := os.Stat(wireguardExePath); os.IsNotExist(err) {
+                // Try to find in PATH
+                var found bool
+                wireguardExePath, found = findInPath("wireguard.exe")
+                if !found {
+                        log.Printf("[warn] wireguard.exe not found at default location or in PATH")
+                        log.Printf("[warn] WireGuard protocol will not be available")
+                } else {
+                        log.Printf("[info] wireguard.exe found in PATH: %s", wireguardExePath)
+                }
+        } else {
+                log.Printf("[info] wireguard.exe found at: %s", wireguardExePath)
+        }
+
         // 1. Protocol handlers
         protoHandlers := map[engine.Protocol]engine.ProtocolHandler{
                 engine.ProtocolVLESS:     protocols.NewXrayHandler(filepath.Join(*binDir, "xray-core.exe")),
                 engine.ProtocolVMESS:     protocols.NewXrayHandler(filepath.Join(*binDir, "xray-core.exe")),
-                engine.ProtocolWireGuard: protocols.NewWireGuardHandler(filepath.Join(*binDir, "wireguard-go.exe")),
+                engine.ProtocolWireGuard: protocols.NewWireGuardHandler(wireguardExePath),
                 engine.ProtocolHysteria:  protocols.NewHysteriaHandler(filepath.Join(*binDir, "hysteria.exe")),
                 engine.ProtocolAmneziaWG: protocols.NewAmneziaHandler(filepath.Join(*binDir, "amnezia-wg.exe")),
         }
@@ -167,4 +185,16 @@ func main() {
         subUpdater.Stop()
         wintun.Unload()
         log.Println("[info] shutdown complete")
+}
+
+// findInPath searches for an executable in the system PATH.
+func findInPath(name string) (string, bool) {
+        path := os.Getenv("PATH")
+        for _, dir := range strings.Split(path, ";") {
+                fullPath := filepath.Join(dir, name)
+                if _, err := os.Stat(fullPath); err == nil {
+                        return fullPath, true
+                }
+        }
+        return "", false
 }
