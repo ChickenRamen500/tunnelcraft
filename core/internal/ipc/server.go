@@ -912,7 +912,7 @@ func serverConfigToEntry(sc engine.ServerConfig) config.ServerEntry {
 
 // NewGRPCClient creates a gRPC client connection for use by Tauri.
 func NewGRPCClient(addr string) (protos.TunnelServiceClient, protos.ServerServiceClient, protos.SubscriptionServiceClient, protos.SettingsServiceClient, protos.RoutingServiceClient, protos.DiagnosticsServiceClient, error) {
-        conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+        conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
         if err != nil {
                 return nil, nil, nil, nil, nil, nil, err
         }

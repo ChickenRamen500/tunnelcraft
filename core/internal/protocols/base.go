@@ -3,6 +3,7 @@
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -173,6 +174,7 @@ fmt.Fprintf(os.Stderr, "[%s] [%s] %s", b.name, prefix, string(buf[:n]))
 			b.mu.Unlock()
 		}
 		if err != nil {
+			log.Printf("[%s] [%s] pipe closed: %v", b.name, prefix, err)
 			return
 		}
 	}

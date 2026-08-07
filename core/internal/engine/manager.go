@@ -165,6 +165,7 @@ func (m *Manager) Connect(ctx context.Context, serverID string) error {
 		return fmt.Errorf("failed to start protocol: %w", err)
 	}
 	log.Printf("[manager] handler.Start() returned successfully")
+	log.Printf("[manager] Process running: %v, PID: %d", handler.IsRunning(), getProcessPID(handler))
 
 	// Setup TUN and routing
 	if m.tunnel != nil {
@@ -292,6 +293,13 @@ func (m *Manager) SetProtocolHandlers(handlers map[Protocol]ProtocolHandler) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.protoHandlers = handlers
+}
+
+// getProcessPID returns the PID of a running process, or -1 if not available.
+func getProcessPID(handler ProtocolHandler) int {
+	// Try to extract PID from handler using reflection or type assertion
+	// For now, return -1 as placeholder since ProtocolHandler interface doesn't expose PID
+	return -1
 }
 
 // --- internal ---

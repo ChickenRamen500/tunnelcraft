@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/ChickenRamen500/tunnelcraft/core/internal/engine"
 )
@@ -45,7 +46,7 @@ func (w *WireGuardHandler) Start(ctx context.Context, server *engine.ServerConfi
 	// wireguard-go uses TUN interface directly
 	// It creates a tun adapter and configures it
 	tunName := "TunnelCraft-WG"
-	args := []string{tunName}
+	args := []string{tunName, "-f", cfgPath}
 
 	log.Printf("[wireguard] About to launch process with args: %v", args)
 	if err := w.launchProcess(ctx, args, cfgPath); err != nil {
@@ -53,6 +54,12 @@ func (w *WireGuardHandler) Start(ctx context.Context, server *engine.ServerConfi
 		return err
 	}
 	log.Printf("[wireguard] >>> Process launched successfully, PID=%d", w.cmd.Process.Pid)
+
+	// Short delay and check if process is still running
+	time.Sleep(500 * time.Millisecond)
+	if !w.IsRunning() {
+		return fmt.Errorf("wireguard: process exited immediately")
+	}
 
 	w.appendLog("[wireguard] process started (PID: %d), TUN: %s", w.cmd.Process.Pid, tunName)
 	return nil
