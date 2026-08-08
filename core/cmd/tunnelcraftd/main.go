@@ -3,33 +3,33 @@
 package main
 
 import (
-        "context"
-        "flag"
-        "log"
-        "os"
-        "path/filepath"
-        "strings"
-        "time"
+	"context"
+	"flag"
+	"log"
+	"os"
+	"path/filepath"
+	"time"
 
-        "github.com/ChickenRamen500/tunnelcraft/core/internal/config"
-        "github.com/ChickenRamen500/tunnelcraft/core/internal/dns"
-        "github.com/ChickenRamen500/tunnelcraft/core/internal/engine"
-        "github.com/ChickenRamen500/tunnelcraft/core/internal/ipc"
-        "github.com/ChickenRamen500/tunnelcraft/core/internal/protocols"
-        "github.com/ChickenRamen500/tunnelcraft/core/internal/subscription"
-        "github.com/ChickenRamen500/tunnelcraft/core/internal/tunnel"
+	"github.com/ChickenRamen500/tunnelcraft/core/internal/config"
+	"github.com/ChickenRamen500/tunnelcraft/core/internal/dns"
+	"github.com/ChickenRamen500/tunnelcraft/core/internal/engine"
+	"github.com/ChickenRamen500/tunnelcraft/core/internal/ipc"
+	"github.com/ChickenRamen500/tunnelcraft/core/internal/protocols"
+	"github.com/ChickenRamen500/tunnelcraft/core/internal/subscription"
+	"github.com/ChickenRamen500/tunnelcraft/core/internal/tunnel"
 )
 
 // Version is set at build time via -ldflags.
 var Version = "0.1.0-dev"
 
 func main() {
-        // Parse command-line flags
-        configPath := flag.String("config", "", "path to config.yaml")
-        dataDir := flag.String("data", "", "path to data directory")
-        binDir := flag.String("bin", "", "path to binaries directory")
-        showVersion := flag.Bool("version", false, "print version and exit")
-        flag.Parse()
+	// Parse command-line flags
+	configPath := flag.String("config", "", "path to config.yaml")
+	dataDir := flag.String("data", "", "path to data directory")
+	binDir := flag.String("bin", "", "path to binaries directory")
+	wireguardPath := flag.String("wireguard", "", "path to wireguard.exe")
+	showVersion := flag.Bool("version", false, "print version and exit")
+	flag.Parse()
 
         if *showVersion {
                 log.Printf("tunnelcraftd v%s\n", Version)
@@ -77,20 +77,32 @@ func main() {
         ctx := context.Background()
 
         // Determine path to wireguard.exe
-        // Default: C:\Program Files\WireGuard\wireguard.exe
-        wireguardExePath := `C:\Program Files\WireGuard\wireguard.exe`
-        if _, err := os.Stat(wireguardExePath); os.IsNotExist(err) {
-                // Try to find in PATH
-                var found bool
-                wireguardExePath, found = findInPath("wireguard.exe")
-                if !found {
-                        log.Printf("[warn] wireguard.exe not found at default location or in PATH")
-                        log.Printf("[warn] WireGuard protocol will not be available")
-                } else {
-                        log.Printf("[info] wireguard.exe found in PATH: %s", wireguardExePath)
+        // Priority: 1) -wireguard flag, 2) binDir/wireguard.exe, 3) system installation
+        wireguardExePath := *wireguardPath
+        if wireguardExePath == "" {
+                // First: look in our bin directory
+                localWG := filepath.Join(*binDir, "wireguard.exe")
+                if _, err := os.Stat(localWG); err == nil {
+                        wireguardExePath = localWG
                 }
+        }
+        if wireguardExePath == "" {
+                // Fallback: system installation
+                candidates := []string{
+                        filepath.Join(os.Getenv("ProgramFiles"), "WireGuard", "wireguard.exe"),
+                        filepath.Join(os.Getenv("ProgramFiles(x86)"), "WireGuard", "wireguard.exe"),
+                }
+                for _, c := range candidates {
+                        if _, err := os.Stat(c); err == nil {
+                                wireguardExePath = c
+                                break
+                        }
+                }
+        }
+        if wireguardExePath != "" {
+                log.Printf("[info] wireguard.exe: %s", wireguardExePath)
         } else {
-                log.Printf("[info] wireguard.exe found at: %s", wireguardExePath)
+                log.Printf("[warn] wireguard.exe not found, WireGuard will not work")
         }
 
         // 1. Protocol handlers
@@ -185,16 +197,4 @@ func main() {
         subUpdater.Stop()
         wintun.Unload()
         log.Println("[info] shutdown complete")
-}
-
-// findInPath searches for an executable in the system PATH.
-func findInPath(name string) (string, bool) {
-        path := os.Getenv("PATH")
-        for _, dir := range strings.Split(path, ";") {
-                fullPath := filepath.Join(dir, name)
-                if _, err := os.Stat(fullPath); err == nil {
-                        return fullPath, true
-                }
-        }
-        return "", false
 }
