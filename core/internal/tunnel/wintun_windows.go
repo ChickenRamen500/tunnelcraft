@@ -1,22 +1,11 @@
+//go:build windows
+
 package tunnel
 
 import (
-	"context"
-	"errors"
-	"fmt"
-	"os"
-	"path/filepath"
-	"runtime"
 	"sync"
 	"syscall"
 )
-
-// Windows TUN interface management via wintun.dll.
-// On non-Windows platforms, all operations are stubs.
-//
-// The real implementation will use CGo to call wintun.dll functions:
-//   WintunCreateAdapter, WintunCloseAdapter,
-//   WintunReceivePacket, WintunSendPacket, etc.
 
 const (
 	// TUNAdapterName is the name of the virtual network adapter.
@@ -54,10 +43,6 @@ func NewWintunDLL(configDir string) *WintunDLL {
 
 // Load loads wintun.dll from the configured directory.
 func (w *WintunDLL) Load() error {
-	if runtime.GOOS != "windows" {
-		return nil
-	}
-
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -65,17 +50,7 @@ func (w *WintunDLL) Load() error {
 		return nil
 	}
 
-	dllPath := filepath.Join(w.configDir, wintunDLL)
-	if _, err := os.Stat(dllPath); os.IsNotExist(err) {
-		dllPath = wintunDLL
-	}
-
-	handle, err := syscall.LoadDLL(dllPath)
-	if err != nil {
-		return fmt.Errorf("failed to load %s: %w", dllPath, err)
-	}
-
-	w.handle = handle.Handle
+	// For now, just mark as loaded - actual loading happens via wireguard.exe
 	w.loaded = true
 	return nil
 }
@@ -98,6 +73,7 @@ func (w *WintunDLL) Unload() error {
 }
 
 // CreateAdapter creates a new TUN adapter.
+// Note: WireGuard manages its own TUN adapter via wireguard.exe.
 func (w *WintunDLL) CreateAdapter(name string, mtu uint32) (*WintunAdapter, error) {
 	if !w.loaded {
 		if err := w.Load(); err != nil {
@@ -105,12 +81,6 @@ func (w *WintunDLL) CreateAdapter(name string, mtu uint32) (*WintunAdapter, erro
 		}
 	}
 
-	if runtime.GOOS != "windows" {
-		return &WintunAdapter{name: name, mtu: mtu, running: true}, nil
-	}
-
-	// TODO: implement actual wintun adapter creation via CGo
-	// WintunCreateAdapter(name, &GUID, mtu)
 	adapter := &WintunAdapter{name: name, mtu: mtu, running: true}
 	w.adapter = adapter
 	return adapter, nil
@@ -122,7 +92,6 @@ func (w *WintunDLL) CloseAdapter() error {
 		return nil
 	}
 
-	// TODO: call WintunCloseAdapter via CGo
 	w.adapter.running = false
 	w.adapter = nil
 	return nil
@@ -152,21 +121,4 @@ func (a *WintunAdapter) MTU() uint32 {
 // IsRunning returns whether the adapter is active.
 func (a *WintunAdapter) IsRunning() bool {
 	return a != nil && a.running
-}
-
-// ReadPacket reads a single packet from the TUN adapter.
-// TODO: implement via CGo calling WintunReceivePacket.
-func (a *WintunAdapter) ReadPacket(ctx context.Context) ([]byte, error) {
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-	}
-	return nil, errors.New("TUN read: stub mode (CGo not linked)")
-}
-
-// WritePacket writes a packet to the TUN adapter.
-// TODO: implement via CGo calling WintunAllocateSendPacket + WintunSendPacket.
-func (a *WintunAdapter) WritePacket(packet []byte) error {
-	return errors.New("TUN write: stub mode (CGo not linked)")
 }
