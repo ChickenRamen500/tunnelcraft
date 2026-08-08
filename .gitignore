@@ -67,3 +67,4 @@ Thumbs.db
 ```
 wireguard-go/
 bin/data/config.yaml
+query
