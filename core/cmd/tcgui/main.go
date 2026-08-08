@@ -235,9 +235,11 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	resp, err := tunnelClient.GetConnectionStatus(ctx, &protos.GetConnectionStatusRequest{})
 	if err != nil {
 		// Don't return 500 — daemon might be temporarily unreachable
+		log.Printf("[tcgui] GetConnectionStatus error: %v", err)
 		json.NewEncoder(w).Encode(StatusResponse{State: "disconnected", Error: "daemon not connected"})
 		return
 	}
+	log.Printf("[tcgui] status: state=%d, server=%s", resp.State, resp.ServerId)
 	stateStr := "disconnected"
 	switch resp.State {
 	case protos.ConnectionState_CONNECTION_STATE_DISCONNECTED:
@@ -487,6 +489,7 @@ function doRefresh() {
 
 function updateStatus() {
   api('/api/status').then(function(st) {
+    console.log('[tcgui] status response:', JSON.stringify(st));
     var state = st.state || 'disconnected';
     document.getElementById('stState').textContent = state;
     document.getElementById('stServer').textContent = st.serverId || '--';

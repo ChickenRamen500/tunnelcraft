@@ -188,9 +188,11 @@ func main() {
         // Block until shutdown signal
         server.Wait()
 
-        // Cleanup on exit
+        // Cleanup on exit - disconnect VPN FIRST, then stop gRPC
         log.Println("[info] shutting down...")
-        _ = mgr.Disconnect(true)
+        log.Printf("[info] disconnecting active VPN before shutdown...")
+        mgr.Disconnect(true)  // force disconnect
+        log.Printf("[info] VPN disconnected")
         dnsProxy.Stop()
         healthChecker.Stop()
         fallbackMgr.Stop()

@@ -17,7 +17,7 @@ import (
 // WireGuardHandler manages WireGuard via wireguard.exe and Windows services.
 type WireGuardHandler struct {
 	mu          sync.Mutex
-	name        string
+	name        string  // "wireguard"
 	binPath     string  // путь к wireguard.exe
 	confPath    string  // путь к текущему .conf
 	tunName     string  // "TunnelCraft-WG"
@@ -129,6 +129,15 @@ func (w *WireGuardHandler) Start(ctx context.Context, server *engine.ServerConfi
 	cmdCtx, cmdCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cmdCancel()
 
+	// Check if tunnel already exists and clean up from previous failed runs
+	w.appendLogLocked("[wireguard] checking for existing tunnel service...")
+	checkCmd := exec.Command(w.binPath, "/uninstalltunnelservice", "TunnelCraft-WG")
+	checkOutput, _ := checkCmd.CombinedOutput()
+	if len(checkOutput) > 0 {
+		log.Printf("[wireguard] pre-cleanup existing tunnel: %s", string(checkOutput))
+		time.Sleep(1 * time.Second)
+	}
+
 	w.mu.Lock()
 	w.confPath = confPath
 	w.appendLogLocked("[wireguard] installing tunnel service with config: %s", confPath)
@@ -175,10 +184,22 @@ func (w *WireGuardHandler) Start(ctx context.Context, server *engine.ServerConfi
 
 	// Wait for service to be in RUNNING state
 	w.appendLog("[wireguard] waiting for service to enter RUNNING state...")
-	serviceReady := w.waitForServiceRunning(cmdCtx, 10*time.Second)
-	if !serviceReady {
-		w.appendLog("[wireguard] WARNING: service did not enter RUNNING state within timeout")
-		// Continue anyway - service might still be starting
+	serviceRunning := w.waitForServiceRunning(cmdCtx, 10*time.Second)
+	if !serviceRunning {
+		w.appendLog("[wireguard] service failed to reach RUNNING state")
+		// Read event log for diagnostics
+		psCmd := exec.Command("powershell", "-Command", 
+			"Get-WinEvent -LogName Application -MaxEvents 5 | Where-Object { $_.Message -like '*WireGuard*' -or $_.ProviderName -like '*WireGuard*' } | Select-Object -ExpandProperty Message")
+		eventOutput, _ := psCmd.CombinedOutput()
+		w.appendLog("[wireguard] Event Log: %s", string(eventOutput))
+		
+		// Try to clean up the dead service/tunnel
+		w.cleanupDeadTunnel()
+		
+		w.mu.Lock()
+		w.confPath = ""
+		w.mu.Unlock()
+		return fmt.Errorf("wireguard: service failed to start (check logs above)")
 	}
 
 	w.mu.Lock()
@@ -249,29 +270,27 @@ func (w *WireGuardHandler) Stop() error {
 	w.appendLogLocked("[wireguard] stopping tunnel service...")
 	log.Printf("[wireguard] Stopping service: %s", w.serviceName)
 
-	// Stop the service first
+	// Stop the service first (may already be dead - ignore errors)
 	stopCmd := exec.Command("sc", "stop", w.serviceName)
-	output, err := stopCmd.CombinedOutput()
-	if err != nil {
-		// Service might already be stopped
-		log.Printf("[wireguard] sc stop output: %s", string(output))
-	}
+	stopOutput, _ := stopCmd.CombinedOutput() // ignore error, service might already be stopped
+	log.Printf("[wireguard] sc stop output: %s", string(stopOutput))
 
 	// Wait for service to stop
 	time.Sleep(2 * time.Second)
 
-	// Uninstall the tunnel service
+	// Uninstall the tunnel service (ignore errors)
 	w.appendLogLocked("[wireguard] uninstalling tunnel service...")
 	log.Printf("[wireguard] Uninstalling service: %s", w.serviceName)
 
 	uninstallCmd := exec.Command(w.binPath, "/uninstalltunnelservice", "TunnelCraft-WG")
-	output, err = uninstallCmd.CombinedOutput()
-	if err != nil {
-		w.appendLogLocked("[wireguard] uninstalltunnelservice FAILED: %v, output: %s", err, string(output))
-		log.Printf("[wireguard] wireguard.exe uninstall output: %s", string(output))
-	} else {
-		w.appendLogLocked("[wireguard] tunnel service uninstalled successfully")
-		log.Printf("[wireguard] wireguard.exe uninstall output: %s", string(output))
+	uninstallOutput, _ := uninstallCmd.CombinedOutput() // ignore error
+	log.Printf("[wireguard] uninstalltunnelservice output: %s", string(uninstallOutput))
+
+	// Also try /removetunnelservice as additional cleanup
+	removeCmd := exec.Command(w.binPath, "/removetunnelservice", "TunnelCraft-WG")
+	removeOutput, _ := removeCmd.CombinedOutput() // may not exist, ignore errors
+	if len(removeOutput) > 0 {
+		log.Printf("[wireguard] removetunnelservice output: %s", string(removeOutput))
 	}
 
 	// Remove config file
@@ -282,6 +301,7 @@ func (w *WireGuardHandler) Stop() error {
 		w.confPath = ""
 	}
 
+	// ALWAYS clear serviceName, even if cleanup failed - prevents "tunnel already installed" on next connect
 	w.serviceName = ""
 	w.startedAt = time.Time{}
 
@@ -378,4 +398,25 @@ func (w *WireGuardHandler) waitForTUNInterface(ctx context.Context, timeout time
 		time.Sleep(500 * time.Millisecond)
 	}
 	return false
+}
+
+// cleanupDeadTunnel attempts to clean up a dead WireGuard tunnel/service.
+// This is called when the service fails to start or is detected as non-running.
+func (w *WireGuardHandler) cleanupDeadTunnel() {
+// Try to uninstall the service if it still exists
+uninstallCmd := exec.Command(w.binPath, "/uninstalltunnelservice", "TunnelCraft-WG")
+uninstallOutput, err := uninstallCmd.CombinedOutput()
+if err != nil {
+log.Printf("[wireguard] cleanupDeadTunnel: uninstall failed: %v, output: %s", err, string(uninstallOutput))
+} else {
+log.Printf("[wireguard] cleanupDeadTunnel: uninstalled dead tunnel service")
+}
+
+// Also try removing the TUN adapter directly using /removetunnelservice
+// On Windows, if the service is dead but TUN persists, this cleans it up
+removeCmd := exec.Command(w.binPath, "/removetunnelservice", "TunnelCraft-WG") 
+removeOutput, _ := removeCmd.CombinedOutput() // may not exist as a command, ignore errors
+if len(removeOutput) > 0 {
+log.Printf("[wireguard] cleanupDeadTunnel: removetunnelservice output: %s", string(removeOutput))
+}
 }
