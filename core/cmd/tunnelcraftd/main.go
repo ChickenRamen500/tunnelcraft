@@ -7,6 +7,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -117,6 +118,11 @@ func main() {
         // 2. Connection manager
         mgr := engine.NewManager(cfgMgr)
         mgr.SetProtocolHandlers(protoHandlers)
+
+        // Clean up leftover WireGuard TUN adapter from previous crash
+        cleanupCmd := exec.Command("powershell", "-Command",
+                "Get-NetAdapter -Name 'TunnelCraft-WG' -ErrorAction SilentlyContinue | Remove-NetAdapter -Confirm:$false")
+        cleanupCmd.Run() // ignore errors
 
         // 3. TUN + Routing
         wintun := tunnel.NewWintunDLL(*binDir)

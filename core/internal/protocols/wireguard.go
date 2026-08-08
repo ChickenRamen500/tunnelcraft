@@ -129,14 +129,13 @@ func (w *WireGuardHandler) Start(ctx context.Context, server *engine.ServerConfi
 	cmdCtx, cmdCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cmdCancel()
 
-	// Check if tunnel already exists and clean up from previous failed runs
-	w.appendLogLocked("[wireguard] checking for existing tunnel service...")
-	checkCmd := exec.Command(w.binPath, "/uninstalltunnelservice", "TunnelCraft-WG")
-	checkOutput, _ := checkCmd.CombinedOutput()
-	if len(checkOutput) > 0 {
-		log.Printf("[wireguard] pre-cleanup existing tunnel: %s", string(checkOutput))
-		time.Sleep(1 * time.Second)
+	// Remove leftover TUN adapter from previous run (if any)
+	psCmd := exec.Command("powershell", "-Command",
+		"Get-NetAdapter -Name '"+w.tunName+"' -ErrorAction SilentlyContinue | Remove-NetAdapter -Confirm:$false")
+	if output, err := psCmd.CombinedOutput(); err == nil && len(output) > 0 {
+		log.Printf("[wireguard] removed leftover TUN adapter: %s", string(output))
 	}
+	time.Sleep(500 * time.Millisecond) // give Windows time to fully remove the adapter
 
 	w.mu.Lock()
 	w.confPath = confPath
@@ -286,12 +285,8 @@ func (w *WireGuardHandler) Stop() error {
 	uninstallOutput, _ := uninstallCmd.CombinedOutput() // ignore error
 	log.Printf("[wireguard] uninstalltunnelservice output: %s", string(uninstallOutput))
 
-	// Also try /removetunnelservice as additional cleanup
-	removeCmd := exec.Command(w.binPath, "/removetunnelservice", "TunnelCraft-WG")
-	removeOutput, _ := removeCmd.CombinedOutput() // may not exist, ignore errors
-	if len(removeOutput) > 0 {
-		log.Printf("[wireguard] removetunnelservice output: %s", string(removeOutput))
-	}
+	// Remove the TUN adapter
+	w.removeTUNAdapter()
 
 	// Remove config file
 	if w.confPath != "" {
@@ -400,23 +395,26 @@ func (w *WireGuardHandler) waitForTUNInterface(ctx context.Context, timeout time
 	return false
 }
 
+// removeTUNAdapter removes the Wintun TUN adapter using PowerShell.
+func (w *WireGuardHandler) removeTUNAdapter() {
+	psCmd := exec.Command("powershell", "-Command",
+		"Get-NetAdapter -Name '"+w.tunName+"' -ErrorAction SilentlyContinue | Remove-NetAdapter -Confirm:$false")
+	psCmd.CombinedOutput() // ignore errors
+	log.Printf("[wireguard] attempted to remove TUN adapter %s", w.tunName)
+}
+
 // cleanupDeadTunnel attempts to clean up a dead WireGuard tunnel/service.
 // This is called when the service fails to start or is detected as non-running.
 func (w *WireGuardHandler) cleanupDeadTunnel() {
-// Try to uninstall the service if it still exists
-uninstallCmd := exec.Command(w.binPath, "/uninstalltunnelservice", "TunnelCraft-WG")
-uninstallOutput, err := uninstallCmd.CombinedOutput()
-if err != nil {
-log.Printf("[wireguard] cleanupDeadTunnel: uninstall failed: %v, output: %s", err, string(uninstallOutput))
-} else {
-log.Printf("[wireguard] cleanupDeadTunnel: uninstalled dead tunnel service")
-}
+	// Try to uninstall the service if it still exists
+	uninstallCmd := exec.Command(w.binPath, "/uninstalltunnelservice", "TunnelCraft-WG")
+	uninstallOutput, err := uninstallCmd.CombinedOutput()
+	if err != nil {
+		log.Printf("[wireguard] cleanupDeadTunnel: uninstall failed: %v, output: %s", err, string(uninstallOutput))
+	} else {
+		log.Printf("[wireguard] cleanupDeadTunnel: uninstalled dead tunnel service")
+	}
 
-// Also try removing the TUN adapter directly using /removetunnelservice
-// On Windows, if the service is dead but TUN persists, this cleans it up
-removeCmd := exec.Command(w.binPath, "/removetunnelservice", "TunnelCraft-WG") 
-removeOutput, _ := removeCmd.CombinedOutput() // may not exist as a command, ignore errors
-if len(removeOutput) > 0 {
-log.Printf("[wireguard] cleanupDeadTunnel: removetunnelservice output: %s", string(removeOutput))
-}
+	// Remove the persistent TUN adapter
+	w.removeTUNAdapter()
 }

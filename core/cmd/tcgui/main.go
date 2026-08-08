@@ -236,7 +236,7 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// Don't return 500 — daemon might be temporarily unreachable
 		log.Printf("[tcgui] GetConnectionStatus error: %v", err)
-		json.NewEncoder(w).Encode(StatusResponse{State: "disconnected", Error: "daemon not connected"})
+		json.NewEncoder(w).Encode(StatusResponse{State: "disconnected", Error: ""})
 		return
 	}
 	log.Printf("[tcgui] status: state=%d, server=%s", resp.State, resp.ServerId)
