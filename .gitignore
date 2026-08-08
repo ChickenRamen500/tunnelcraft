@@ -23,28 +23,22 @@ venv/
 dist/
 build/
 target/
-
-# Logs and temp files
-*.log
-*.tmp
-*.swp
-
-# Editors
-.vscode/
-.idea/
-
-# Coverage
 coverage/
 htmlcov/
-.coverage
+*.log
 
-# MyPy
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# System files
+.DS_Store
+Thumbs.db
 .mypy_cache/
-
-# PyTest
 .pytest_cache/
-
-# Gradle
 .gradle/
 
 # Compressed files
