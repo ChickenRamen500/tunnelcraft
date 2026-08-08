@@ -72,6 +72,14 @@ func (w *WireGuardHandler) Start(ctx context.Context, server *engine.ServerConfi
 	}
 	w.mu.Unlock()
 
+	// Check if wintun.dll exists next to wireguard.exe BEFORE attempting to start
+	binDir := filepath.Dir(w.binPath)
+	wintunPath := filepath.Join(binDir, "wintun.dll")
+	if _, err := os.Stat(wintunPath); os.IsNotExist(err) {
+		return fmt.Errorf("wireguard: wintun.dll not found at %s — download it or run scripts\\download-binaries.ps1", wintunPath)
+	}
+	log.Printf("[wireguard] wintun.dll found at %s", wintunPath)
+
 	// Generate config content
 	log.Printf("[wireguard] Generating config...")
 	configContent, err := w.generateConfigContent(server, socksPort)
@@ -142,19 +150,34 @@ func (w *WireGuardHandler) Start(ctx context.Context, server *engine.ServerConfi
 	w.appendLog("[wireguard] tunnel service installed successfully")
 	log.Printf("[wireguard] wireguard.exe output: %s", string(output))
 
-	// Query service status after install
+	// After install, wait and check if service actually started
+	time.Sleep(3 * time.Second)
 	queryCmd := exec.Command("sc", "query", w.serviceName)
 	queryOutput, _ := queryCmd.CombinedOutput()
-	log.Printf("[wireguard] service query after install: %s", string(queryOutput))
+	log.Printf("[wireguard] service status after 3s: %s", string(queryOutput))
 
-	// Wait for service to start and TUN interface to appear
-	w.appendLog("[wireguard] waiting for TUN interface to appear...")
-	time.Sleep(1 * time.Second)
+	if !strings.Contains(string(queryOutput), "RUNNING") {
+		// Read Windows Event Log for the failure reason
+		psCmd := exec.Command("powershell", "-Command", 
+			"Get-WinEvent -LogName Application -MaxEvents 5 | Where-Object { $_.Message -like '*WireGuard*' -or $_.ProviderName -like '*WireGuard*' } | Select-Object -ExpandProperty Message")
+		eventOutput, _ := psCmd.CombinedOutput()
+		log.Printf("[wireguard] Windows Event Log (WireGuard errors):\n%s", string(eventOutput))
+		
+		// Also check if wintun.dll exists next to wireguard.exe
+		binDir := filepath.Dir(w.binPath)
+		wintunPath := filepath.Join(binDir, "wintun.dll")
+		if _, err := os.Stat(wintunPath); os.IsNotExist(err) {
+			log.Printf("[wireguard] CRITICAL: wintun.dll NOT FOUND at %s", wintunPath)
+		} else {
+			log.Printf("[wireguard] wintun.dll found at %s", wintunPath)
+		}
+	}
 
-	// Check if TUN interface exists
-	tunReady := w.waitForTUNInterface(cmdCtx, 10*time.Second)
-	if !tunReady {
-		w.appendLog("[wireguard] WARNING: TUN interface did not appear within timeout")
+	// Wait for service to be in RUNNING state
+	w.appendLog("[wireguard] waiting for service to enter RUNNING state...")
+	serviceReady := w.waitForServiceRunning(cmdCtx, 10*time.Second)
+	if !serviceReady {
+		w.appendLog("[wireguard] WARNING: service did not enter RUNNING state within timeout")
 		// Continue anyway - service might still be starting
 	}
 
@@ -300,6 +323,25 @@ func (w *WireGuardHandler) GetLogs() []string {
 // GetTUNName returns the TUN interface name used by WireGuard.
 func (w *WireGuardHandler) GetTUNName() string {
 	return w.tunName
+}
+
+// waitForServiceRunning waits for the WireGuard service to enter RUNNING state.
+func (w *WireGuardHandler) waitForServiceRunning(ctx context.Context, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		select {
+		case <-ctx.Done():
+			return false
+		default:
+		}
+		cmd := exec.Command("sc", "query", w.serviceName)
+		output, err := cmd.CombinedOutput()
+		if err == nil && strings.Contains(string(output), "RUNNING") {
+			return true
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	return false
 }
 
 // waitForTUNInterface waits for the TUN interface to appear.

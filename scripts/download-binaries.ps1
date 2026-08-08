@@ -73,6 +73,32 @@ try {
 Write-Host ""
 
 # ------------------------------------------------------------------
+# 2.5. wireguard.exe  — copy from system WireGuard installation
+# ------------------------------------------------------------------
+Write-Host "[2.5/5] wireguard.exe" -ForegroundColor Yellow
+$wgExeSystem = @(
+    "C:\Program Files\WireGuard\wireguard.exe",
+    "C:\Program Files (x86)\WireGuard\wireguard.exe"
+)
+$wgExeDst = Join-Path $BinDir "wireguard.exe"
+$wgCopied = $false
+foreach ($p in $wgExeSystem) {
+    if (Test-Path $p) {
+        Copy-Item $p $wgExeDst -Force
+        $sz = [math]::Round((Get-Item $wgExeDst).Length / 1MB, 2)
+        Write-Host "  [OK] wireguard.exe copied from $p ($sz MB)" -ForegroundColor Green
+        $wgCopied = $true
+        break
+    }
+}
+if (-not $wgCopied) {
+    Write-Host "  [SKIP] wireguard.exe not found on system." -ForegroundColor DarkYellow
+    Write-Host "         Install WireGuard from https://www.wireguard.com/install/" -ForegroundColor DarkYellow
+    Write-Host "         Then re-run this script." -ForegroundColor DarkYellow
+}
+Write-Host ""
+
+# ------------------------------------------------------------------
 # 4. wireguard-go.exe  — extracted from WireGuard for Windows installer
 #    The WireGuard repo has NO releases. We download the official MSI
 #    and extract wireguard-go.exe from it.
@@ -197,7 +223,7 @@ Write-Host ""
 # Summary
 # ------------------------------------------------------------------
 Write-Host "=== Summary ===" -ForegroundColor Cyan
-$required = @("xray-core.exe", "hysteria.exe", "wintun.dll", "wireguard-go.exe")
+$required = @("xray-core.exe", "hysteria.exe", "wintun.dll", "wireguard.exe")
 $ok = 0
 $fail = 0
 foreach ($f in $required) {

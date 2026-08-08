@@ -2,41 +2,64 @@
 # Compiled and build artifacts
 *.o
 *.obj
+*.out
 *.exe
 *.dll
 *.so
 *.a
-*.out
 
 # Dependencies
 vendor/
-*.mod
-*.sum
+node_modules/
+__pycache__/
+*.egg-info/
+.Python
+env/
+venv/
+.venv/
+.env
+.env.local
+*.env.*
+
+# Build directories
+build/
+dist/
+target/
+release/
+debug/
 
 # Logs and temp files
 *.log
 *.tmp
 *.swp
+*.swo
 
 # Editors
 .vscode/
 .idea/
+*.swp
+*~
 
-# Environment
-.env
-.env.local
-*.env.*
+# OS generated files
+.DS_Store
+Thumbs.db
 
-# Coverage
+# Coverage reports
 coverage/
 htmlcov/
 .coverage
 
-# Build directories
-dist/
-build/
-target/
+# MyPy cache
+.mypy_cache/
+
+# Pytest cache
+.pytest_cache/
+
+# Gradle
+.gradle/
+
+# Go specific
+*.a
+*.so
+*.dylib
 ```
-query
-wireguard-go/
-bin/data/config.yaml
