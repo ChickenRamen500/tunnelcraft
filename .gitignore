@@ -39,3 +39,4 @@ target/
 ```
 query
 wireguard-go/
+bin/data/config.yaml
