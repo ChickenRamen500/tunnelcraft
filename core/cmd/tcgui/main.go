@@ -127,12 +127,12 @@ func protocolName(p protos.Protocol) string {
 
 func handleServers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	resp, err := serverClient.ListServers(ctx, &protos.ListServersRequest{})
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		// Return empty list instead of 500
+		json.NewEncoder(w).Encode([]ServerInfo{})
 		return
 	}
 	servers := make([]ServerInfo, len(resp.Servers))
@@ -230,12 +230,12 @@ func handleDisconnect(w http.ResponseWriter, r *http.Request) {
 
 func handleStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	resp, err := tunnelClient.GetConnectionStatus(ctx, &protos.GetConnectionStatusRequest{})
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(StatusResponse{State: "error", Error: err.Error()})
+		// Don't return 500 — daemon might be temporarily unreachable
+		json.NewEncoder(w).Encode(StatusResponse{State: "disconnected", Error: "daemon not connected"})
 		return
 	}
 	stateStr := "disconnected"
