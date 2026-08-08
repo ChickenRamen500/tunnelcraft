@@ -43,6 +43,22 @@ func (w *WireGuardHandler) Name() string {
 	return w.name
 }
 
+// appendLogLocked adds a log line to the buffer. MUST be called with w.mu already locked.
+func (w *WireGuardHandler) appendLogLocked(format string, args ...interface{}) {
+	line := fmt.Sprintf(format, args...)
+	if len(w.logBuffer) >= w.maxLogs {
+		w.logBuffer = w.logBuffer[len(w.logBuffer)/2:]
+	}
+	w.logBuffer = append(w.logBuffer, line)
+}
+
+// appendLog adds a log line to the buffer.
+func (w *WireGuardHandler) appendLog(format string, args ...interface{}) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.appendLogLocked(format, args...)
+}
+
 // Start generates a WireGuard config, copies it to a permanent location,
 // and installs it as a Windows service via wireguard.exe.
 func (w *WireGuardHandler) Start(ctx context.Context, server *engine.ServerConfig, socksPort, httpPort uint32) error {
@@ -64,27 +80,50 @@ func (w *WireGuardHandler) Start(ctx context.Context, server *engine.ServerConfi
 		return fmt.Errorf("wireguard: failed to generate config: %w", err)
 	}
 
-	// Ensure tunnels directory exists
-	baseDir := filepath.Dir(w.binPath)
-	if baseDir == "" {
-		exe, _ := os.Executable()
-		baseDir = filepath.Dir(exe)
+	// Determine config path - prefer WireGuard's standard Data directory
+	var confPath string
+	programFiles := os.Getenv("ProgramFiles")
+	if programFiles == "" {
+		programFiles = `C:\Program Files`
 	}
-	tunnelsDir := filepath.Join(baseDir, "data", "tunnels")
-	if err := os.MkdirAll(tunnelsDir, 0755); err != nil {
-		return fmt.Errorf("wireguard: failed to create tunnels dir: %w", err)
+	wgDataDir := filepath.Join(programFiles, "WireGuard", "Data")
+	
+	// Try to use WireGuard's standard Data directory first
+	if err := os.MkdirAll(wgDataDir, 0755); err == nil {
+		confPath = filepath.Join(wgDataDir, "TunnelCraft-WG.conf")
+		if err := os.WriteFile(confPath, []byte(configContent), 0600); err == nil {
+			log.Printf("[wireguard] Config saved to: %s", confPath)
+		} else {
+			// Fallback to local tunnels directory
+			confPath = ""
+		}
+	}
+	
+	// Fallback to local tunnels directory if WireGuard Data dir is not accessible
+	if confPath == "" {
+		baseDir := filepath.Dir(w.binPath)
+		if baseDir == "" {
+			exe, _ := os.Executable()
+			baseDir = filepath.Dir(exe)
+		}
+		tunnelsDir := filepath.Join(baseDir, "data", "tunnels")
+		if err := os.MkdirAll(tunnelsDir, 0755); err != nil {
+			return fmt.Errorf("wireguard: failed to create tunnels dir: %w", err)
+		}
+		confPath = filepath.Join(tunnelsDir, "TunnelCraft-WG.conf")
+		if err := os.WriteFile(confPath, []byte(configContent), 0600); err != nil {
+			return fmt.Errorf("wireguard: failed to write config file: %w", err)
+		}
+		log.Printf("[wireguard] Config saved to: %s (fallback)", confPath)
 	}
 
-	// Save config to permanent location
-	confPath := filepath.Join(tunnelsDir, "TunnelCraft-WG.conf")
-	if err := os.WriteFile(confPath, []byte(configContent), 0600); err != nil {
-		return fmt.Errorf("wireguard: failed to write config file: %w", err)
-	}
-	log.Printf("[wireguard] Config saved to: %s", confPath)
+	// Create independent context for shell commands (not tied to gRPC client context)
+	cmdCtx, cmdCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cmdCancel()
 
 	w.mu.Lock()
 	w.confPath = confPath
-	w.appendLog("[wireguard] installing tunnel service with config: %s", confPath)
+	w.appendLogLocked("[wireguard] installing tunnel service with config: %s", confPath)
 	w.mu.Unlock()
 
 	// Install tunnel service using wireguard.exe
@@ -92,7 +131,7 @@ func (w *WireGuardHandler) Start(ctx context.Context, server *engine.ServerConfi
 	args := []string{"/installtunnelservice", confPath}
 	log.Printf("[wireguard] Running: %s %v", w.binPath, args)
 
-	cmd := exec.CommandContext(ctx, w.binPath, args...)
+	cmd := exec.CommandContext(cmdCtx, w.binPath, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		w.appendLog("[wireguard] installtunnelservice FAILED: %v, output: %s", err, string(output))
@@ -103,12 +142,17 @@ func (w *WireGuardHandler) Start(ctx context.Context, server *engine.ServerConfi
 	w.appendLog("[wireguard] tunnel service installed successfully")
 	log.Printf("[wireguard] wireguard.exe output: %s", string(output))
 
+	// Query service status after install
+	queryCmd := exec.Command("sc", "query", w.serviceName)
+	queryOutput, _ := queryCmd.CombinedOutput()
+	log.Printf("[wireguard] service query after install: %s", string(queryOutput))
+
 	// Wait for service to start and TUN interface to appear
 	w.appendLog("[wireguard] waiting for TUN interface to appear...")
 	time.Sleep(1 * time.Second)
 
 	// Check if TUN interface exists
-	tunReady := w.waitForTUNInterface(ctx, 10*time.Second)
+	tunReady := w.waitForTUNInterface(cmdCtx, 10*time.Second)
 	if !tunReady {
 		w.appendLog("[wireguard] WARNING: TUN interface did not appear within timeout")
 		// Continue anyway - service might still be starting
@@ -116,7 +160,7 @@ func (w *WireGuardHandler) Start(ctx context.Context, server *engine.ServerConfi
 
 	w.mu.Lock()
 	w.startedAt = time.Now()
-	w.appendLog("[wireguard] service started, TUN: %s", w.tunName)
+	w.appendLogLocked("[wireguard] service started, TUN: %s", w.tunName)
 	w.mu.Unlock()
 
 	log.Printf("[wireguard] >>> Process launched successfully")
@@ -179,7 +223,7 @@ func (w *WireGuardHandler) Stop() error {
 		return nil // Not running
 	}
 
-	w.appendLog("[wireguard] stopping tunnel service...")
+	w.appendLogLocked("[wireguard] stopping tunnel service...")
 	log.Printf("[wireguard] Stopping service: %s", w.serviceName)
 
 	// Stop the service first
@@ -194,16 +238,16 @@ func (w *WireGuardHandler) Stop() error {
 	time.Sleep(2 * time.Second)
 
 	// Uninstall the tunnel service
-	w.appendLog("[wireguard] uninstalling tunnel service...")
+	w.appendLogLocked("[wireguard] uninstalling tunnel service...")
 	log.Printf("[wireguard] Uninstalling service: %s", w.serviceName)
 
 	uninstallCmd := exec.Command(w.binPath, "/uninstalltunnelservice", "TunnelCraft-WG")
 	output, err = uninstallCmd.CombinedOutput()
 	if err != nil {
-		w.appendLog("[wireguard] uninstalltunnelservice FAILED: %v, output: %s", err, string(output))
+		w.appendLogLocked("[wireguard] uninstalltunnelservice FAILED: %v, output: %s", err, string(output))
 		log.Printf("[wireguard] wireguard.exe uninstall output: %s", string(output))
 	} else {
-		w.appendLog("[wireguard] tunnel service uninstalled successfully")
+		w.appendLogLocked("[wireguard] tunnel service uninstalled successfully")
 		log.Printf("[wireguard] wireguard.exe uninstall output: %s", string(output))
 	}
 
@@ -275,19 +319,21 @@ func (w *WireGuardHandler) waitForTUNInterface(ctx context.Context, timeout time
 			return true
 		}
 
+		// Alternative check via ipconfig
+		ipconfigCmd := exec.Command("ipconfig", "/all")
+		ipconfigOutput, _ := ipconfigCmd.CombinedOutput()
+		if strings.Contains(string(ipconfigOutput), w.tunName) {
+			return true
+		}
+
+		// Alternative check via PowerShell Get-NetAdapter
+		psCmd := exec.Command("powershell", "-Command", fmt.Sprintf("Get-NetAdapter -Name \"%s\" -ErrorAction SilentlyContinue", w.tunName))
+		psOutput, _ := psCmd.CombinedOutput()
+		if len(psOutput) > 0 && !strings.Contains(string(psOutput), "MSFT_NetAdapter") {
+			return true
+		}
+
 		time.Sleep(500 * time.Millisecond)
 	}
 	return false
-}
-
-// appendLog adds a log line to the buffer.
-func (w *WireGuardHandler) appendLog(format string, args ...interface{}) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	line := fmt.Sprintf(format, args...)
-	if len(w.logBuffer) >= w.maxLogs {
-		w.logBuffer = w.logBuffer[len(w.logBuffer)/2:]
-	}
-	w.logBuffer = append(w.logBuffer, line)
 }
