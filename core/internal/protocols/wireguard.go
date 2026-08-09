@@ -274,8 +274,23 @@ func (w *WireGuardHandler) Stop() error {
 	stopOutput, _ := stopCmd.CombinedOutput() // ignore error, service might already be stopped
 	log.Printf("[wireguard] sc stop output: %s", string(stopOutput))
 
-	// Wait for service to stop
-	time.Sleep(2 * time.Second)
+	// Wait for service to reach STOPPED state (not just fixed sleep)
+	stopDeadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(stopDeadline) {
+		checkCmd := exec.Command("sc", "query", w.serviceName)
+		out, err := checkCmd.CombinedOutput()
+		if err != nil {
+			break // service gone
+		}
+		if strings.Contains(string(out), "STOPPED") {
+			break
+		}
+		if strings.Contains(string(out), "not exist") {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	log.Printf("[wireguard] service stop completed")
 
 	// Uninstall the tunnel service (ignore errors)
 	w.appendLogLocked("[wireguard] uninstalling tunnel service...")
@@ -284,6 +299,14 @@ func (w *WireGuardHandler) Stop() error {
 	uninstallCmd := exec.Command(w.binPath, "/uninstalltunnelservice", "TunnelCraft-WG")
 	uninstallOutput, _ := uninstallCmd.CombinedOutput() // ignore error
 	log.Printf("[wireguard] uninstalltunnelservice output: %s", string(uninstallOutput))
+
+	// Kill all wireguard.exe processes to ensure adapter is released
+	killCmd := exec.Command("taskkill", "/F", "/IM", "wireguard.exe")
+	killOutput, _ := killCmd.CombinedOutput()
+	if len(killOutput) > 0 {
+		log.Printf("[wireguard] killed wireguard processes: %s", string(killOutput))
+	}
+	time.Sleep(1 * time.Second) // give Windows time to release adapter
 
 	// Remove the TUN adapter
 	w.removeTUNAdapter()
@@ -398,9 +421,16 @@ func (w *WireGuardHandler) waitForTUNInterface(ctx context.Context, timeout time
 // removeTUNAdapter removes the Wintun TUN adapter using PowerShell.
 func (w *WireGuardHandler) removeTUNAdapter() {
 	psCmd := exec.Command("powershell", "-Command",
-		"Get-NetAdapter -Name '"+w.tunName+"' -ErrorAction SilentlyContinue | Remove-NetAdapter -Confirm:$false")
-	psCmd.CombinedOutput() // ignore errors
-	log.Printf("[wireguard] attempted to remove TUN adapter %s", w.tunName)
+		"Get-NetAdapter -Name '"+w.tunName+"' -ErrorAction SilentlyContinue | Remove-NetAdapter -Confirm:$false 2>&1")
+	output, err := psCmd.CombinedOutput()
+	if err != nil {
+		log.Printf("[wireguard] failed to remove TUN adapter %s: %v, output: %s", 
+			w.tunName, err, string(output))
+	} else if len(output) > 0 {
+		log.Printf("[wireguard] removed TUN adapter %s: %s", w.tunName, string(output))
+	} else {
+		log.Printf("[wireguard] TUN adapter %s not found (already removed)", w.tunName)
+	}
 }
 
 // cleanupDeadTunnel attempts to clean up a dead WireGuard tunnel/service.
