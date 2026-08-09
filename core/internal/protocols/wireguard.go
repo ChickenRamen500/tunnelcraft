@@ -129,12 +129,8 @@ func (w *WireGuardHandler) Start(ctx context.Context, server *engine.ServerConfi
 	cmdCtx, cmdCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cmdCancel()
 
-	// Remove leftover TUN adapter from previous run (if any)
-	psCmd := exec.Command("powershell", "-Command",
-		"Get-NetAdapter -Name '"+w.tunName+"' -ErrorAction SilentlyContinue | Remove-NetAdapter -Confirm:$false")
-	if output, err := psCmd.CombinedOutput(); err == nil && len(output) > 0 {
-		log.Printf("[wireguard] removed leftover TUN adapter: %s", string(output))
-	}
+	// Remove leftover TUN adapter from previous run (if any) - pre-cleanup
+	w.removeTUNAdapter()
 	time.Sleep(500 * time.Millisecond) // give Windows time to fully remove the adapter
 
 	w.mu.Lock()
@@ -183,23 +179,12 @@ func (w *WireGuardHandler) Start(ctx context.Context, server *engine.ServerConfi
 
 	// Wait for service to be in RUNNING state
 	w.appendLog("[wireguard] waiting for service to enter RUNNING state...")
-	serviceRunning := w.waitForServiceRunning(cmdCtx, 10*time.Second)
-	if !serviceRunning {
-		w.appendLog("[wireguard] service failed to reach RUNNING state")
-		// Read event log for diagnostics
-		psCmd := exec.Command("powershell", "-Command", 
-			"Get-WinEvent -LogName Application -MaxEvents 5 | Where-Object { $_.Message -like '*WireGuard*' -or $_.ProviderName -like '*WireGuard*' } | Select-Object -ExpandProperty Message")
-		eventOutput, _ := psCmd.CombinedOutput()
-		w.appendLog("[wireguard] Event Log: %s", string(eventOutput))
-		
-		// Try to clean up the dead service/tunnel
+	if err := w.waitForServiceRunning(w.serviceName, 15*time.Second); err != nil {
+		log.Printf("[wireguard] %v", err)
 		w.cleanupDeadTunnel()
-		
-		w.mu.Lock()
-		w.confPath = ""
-		w.mu.Unlock()
-		return fmt.Errorf("wireguard: service failed to start (check logs above)")
+		return fmt.Errorf("service failed to start: %w", err)
 	}
+	log.Printf("[wireguard] >>> Process launched successfully (service is RUNNING)")
 
 	w.mu.Lock()
 	w.startedAt = time.Now()
@@ -274,21 +259,15 @@ func (w *WireGuardHandler) Stop() error {
 	stopOutput, _ := stopCmd.CombinedOutput() // ignore error, service might already be stopped
 	log.Printf("[wireguard] sc stop output: %s", string(stopOutput))
 
-	// Wait for service to reach STOPPED state (not just fixed sleep)
-	stopDeadline := time.Now().Add(15 * time.Second)
-	for time.Now().Before(stopDeadline) {
-		checkCmd := exec.Command("sc", "query", w.serviceName)
-		out, err := checkCmd.CombinedOutput()
-		if err != nil {
-			break // service gone
-		}
-		if strings.Contains(string(out), "STOPPED") {
+	// После sc stop — ждём реальной остановки
+	for i := 0; i < 15; i++ {
+		cmd := exec.Command("sc", "query", w.serviceName)
+		output, _ := cmd.CombinedOutput()
+		if strings.Contains(string(output), "STOPPED") {
+			log.Printf("[wireguard] service confirmed STOPPED after %d seconds", i+1)
 			break
 		}
-		if strings.Contains(string(out), "not exist") {
-			break
-		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(1 * time.Second)
 	}
 	log.Printf("[wireguard] service stop completed")
 
@@ -364,22 +343,27 @@ func (w *WireGuardHandler) GetTUNName() string {
 }
 
 // waitForServiceRunning waits for the WireGuard service to enter RUNNING state.
-func (w *WireGuardHandler) waitForServiceRunning(ctx context.Context, timeout time.Duration) bool {
+func (w *WireGuardHandler) waitForServiceRunning(serviceName string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		select {
-		case <-ctx.Done():
-			return false
-		default:
-		}
-		cmd := exec.Command("sc", "query", w.serviceName)
+		cmd := exec.Command("sc", "query", serviceName)
 		output, err := cmd.CombinedOutput()
-		if err == nil && strings.Contains(string(output), "RUNNING") {
-			return true
+		if err != nil {
+			return fmt.Errorf("sc query failed: %w", err)
 		}
-		time.Sleep(500 * time.Millisecond)
+		
+		// Парсим STATE из вывода sc query
+		if strings.Contains(string(output), "RUNNING") {
+			return nil // Сервис реально запущен
+		}
+		if strings.Contains(string(output), "STOPPED") {
+			return fmt.Errorf("service stopped unexpectedly (check Windows Event Log for WireGuard errors)")
+		}
+		
+		// START_PENDING или PAUSED — продолжаем ждать
+		time.Sleep(1 * time.Second)
 	}
-	return false
+	return fmt.Errorf("service did not reach RUNNING state within %v (still in START_PENDING or other state)", timeout)
 }
 
 // waitForTUNInterface waits for the TUN interface to appear.
@@ -418,19 +402,54 @@ func (w *WireGuardHandler) waitForTUNInterface(ctx context.Context, timeout time
 	return false
 }
 
-// removeTUNAdapter removes the Wintun TUN adapter using PowerShell.
-func (w *WireGuardHandler) removeTUNAdapter() {
-	psCmd := exec.Command("powershell", "-Command",
-		"Get-NetAdapter -Name '"+w.tunName+"' -ErrorAction SilentlyContinue | Remove-NetAdapter -Confirm:$false 2>&1")
-	output, err := psCmd.CombinedOutput()
-	if err != nil {
-		log.Printf("[wireguard] failed to remove TUN adapter %s: %v, output: %s", 
-			w.tunName, err, string(output))
-	} else if len(output) > 0 {
-		log.Printf("[wireguard] removed TUN adapter %s: %s", w.tunName, string(output))
-	} else {
-		log.Printf("[wireguard] TUN adapter %s not found (already removed)", w.tunName)
+// removeTUNAdapter removes the Wintun TUN adapter using PowerShell with fallback strategies.
+func (w *WireGuardHandler) removeTUNAdapter() error {
+	adapterName := "TunnelCraft-WG"
+	log.Printf("[wireguard] Removing TUN adapter: %s", adapterName)
+	
+	// Метод 1: PowerShell 5.1 Desktop (самый частый на Windows 10/11)
+	cmd := exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
+		"-Command", fmt.Sprintf("Import-Module NetAdapter; Remove-NetAdapter -Name '%s' -Confirm:$false -ErrorAction SilentlyContinue", adapterName))
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		log.Printf("[wireguard] TUN adapter removed via powershell.exe (method 1)")
+		return nil
 	}
+	log.Printf("[wireguard] Method 1 failed: %v, output: %s", err, string(output))
+	
+	// Метод 2: PowerShell 7 (pwsh)
+	cmd = exec.Command("pwsh.exe", "-NoProfile", "-Command",
+		fmt.Sprintf("Remove-NetAdapter -Name '%s' -Confirm:$false -ErrorAction SilentlyContinue", adapterName))
+	output, err = cmd.CombinedOutput()
+	if err == nil {
+		log.Printf("[wireguard] TUN adapter removed via pwsh.exe (method 2)")
+		return nil
+	}
+	log.Printf("[wireguard] Method 2 failed: %v, output: %s", err, string(output))
+	
+	// Метод 3: WMI через PowerShell (работает везде, где есть PowerShell вообще)
+	cmd = exec.Command("powershell.exe", "-NoProfile", "-Command",
+		fmt.Sprintf("Get-CimInstance -ClassName Win32_NetworkAdapter -Filter \\\"NetConnectionID='%s'\\\" | Remove-CimInstance -ErrorAction SilentlyContinue", adapterName))
+	output, err = cmd.CombinedOutput()
+	if err == nil {
+		log.Printf("[wireguard] TUN adapter removed via WMI (method 3)")
+		return nil
+	}
+	log.Printf("[wireguard] Method 3 failed: %v, output: %s", err, string(output))
+	
+	// Метод 4: devcon.exe (если есть в системе)
+	cmd = exec.Command("cmd.exe", "/C", 
+		fmt.Sprintf("devcon.exe remove @Net\\{00000000-0000-0000-0000-000000000000} 2>nul"))
+	cmd.CombinedOutput() // игнорируем результат, это хитрый fallback
+	
+	// Метод 5: Финальный — удалить через netcfg.exe
+	cmd = exec.Command("cmd.exe", "/C",
+		fmt.Sprintf("netcfg.exe -v -u TUNNELCRAFT_WG 2>nul"))
+	cmd.CombinedOutput()
+	
+	// Даже если все методы упали, логируем но не fatal
+	log.Printf("[wireguard] All TUN adapter removal methods failed, adapter may persist")
+	return fmt.Errorf("failed to remove TUN adapter %s", adapterName)
 }
 
 // cleanupDeadTunnel attempts to clean up a dead WireGuard tunnel/service.
