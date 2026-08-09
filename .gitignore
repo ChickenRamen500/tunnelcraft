@@ -23,3 +23,16 @@ vendor/
 # Go-specific
 *.syso
 ```
+bin/data/config.yaml
+bin/hysteria.exe
+bin/tcctl.exe
+bin/tcgui.exe
+bin/tunnelcraftd.exe
+bin/wg.exe
+bin/wintun.dll
+bin/wireguard-go.exe
+bin/wireguard.exe
+bin/xray-core.exe
+core/query
+query
+wireguard-go/
