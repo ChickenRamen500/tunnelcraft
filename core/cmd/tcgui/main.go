@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -25,6 +26,12 @@ const (
 var (
 	tunnelClient protos.TunnelServiceClient
 	serverClient protos.ServerServiceClient
+)
+
+var (
+	currentStatus   = "disconnected"
+	currentServerID = ""
+	statusMu        sync.RWMutex
 )
 
 func main() {
@@ -205,9 +212,16 @@ func handleConnect(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	_, err := tunnelClient.Connect(ctx, &protos.ConnectRequest{ServerId: path})
 	if err != nil {
+		statusMu.Lock()
+		currentStatus = "error"
+		statusMu.Unlock()
 		json.NewEncoder(w).Encode(ConnectResponse{OK: false, Error: err.Error()})
 		return
 	}
+	statusMu.Lock()
+	currentStatus = "connected"
+	currentServerID = path
+	statusMu.Unlock()
 	json.NewEncoder(w).Encode(ConnectResponse{OK: true})
 }
 
@@ -225,35 +239,25 @@ func handleDisconnect(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
+	statusMu.Lock()
+	currentStatus = "disconnected"
+	currentServerID = ""
+	statusMu.Unlock()
 	json.NewEncoder(w).Encode(OKResponse{OK: true})
 }
 
 func handleStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	resp, err := tunnelClient.GetConnectionStatus(ctx, &protos.GetConnectionStatusRequest{})
-	if err != nil {
-		// Don't return 500 — daemon might be temporarily unreachable
-		log.Printf("[tcgui] GetConnectionStatus error: %v", err)
-		json.NewEncoder(w).Encode(StatusResponse{State: "disconnected", Error: ""})
-		return
-	}
-	log.Printf("[tcgui] status: state=%d, server=%s", resp.State, resp.ServerId)
-	stateStr := "disconnected"
-	switch resp.State {
-	case protos.ConnectionState_CONNECTION_STATE_DISCONNECTED:
-		stateStr = "disconnected"
-	case protos.ConnectionState_CONNECTION_STATE_CONNECTING:
-		stateStr = "connecting"
-	case protos.ConnectionState_CONNECTION_STATE_CONNECTED:
-		stateStr = "connected"
-	case protos.ConnectionState_CONNECTION_STATE_DISCONNECTING:
-		stateStr = "disconnecting"
-	case protos.ConnectionState_CONNECTION_STATE_ERROR:
-		stateStr = "error"
-	}
-	json.NewEncoder(w).Encode(StatusResponse{State: stateStr, ServerID: resp.ServerId, Error: ""})
+	// Возвращаем текущее отслеживаемое состояние
+	// (gRPC GetConnectionStatus не работает из-за бага proto marshaling)
+	statusMu.RLock()
+	state := currentStatus
+	serverID := currentServerID
+	statusMu.RUnlock()
+	json.NewEncoder(w).Encode(StatusResponse{
+		State:    state,
+		ServerID: serverID,
+	})
 }
 
 func handleDelete(w http.ResponseWriter, r *http.Request) {
@@ -456,10 +460,11 @@ function doConnect(id) {
   api('/api/connect/' + id, {method: 'POST'}).then(function(r) {
     if (r.ok) {
       log('Подключено', 'ok');
+      setStatusUI('connected', id);
     } else {
       log('Ошибка: ' + (r.error || '?'), 'err');
+      setStatusUI('error', '');
     }
-    updateStatus();
   }).catch(function(e) { log('Ошибка: ' + e.message, 'err'); });
 }
 
@@ -467,8 +472,20 @@ function doDisconnect() {
   log('Отключение...');
   api('/api/disconnect', {method: 'POST'}).then(function() {
     log('Отключено', 'ok');
-    updateStatus();
+    setStatusUI('disconnected', '');
   }).catch(function(e) { log('Ошибка: ' + e.message, 'err'); });
+}
+
+function setStatusUI(state, serverId) {
+  document.getElementById('stState').textContent = state;
+  document.getElementById('stServer').textContent = serverId || '--';
+  var hs = document.getElementById('headerStatus');
+  var hd = document.getElementById('headerDot');
+  hd.className = 'dot ' + state;
+  if (state === 'connected') hs.textContent = 'Подключено';
+  else if (state === 'connecting') hs.textContent = 'Подключение...';
+  else if (state === 'error') hs.textContent = 'Ошибка';
+  else hs.textContent = 'Отключено';
 }
 
 function doDelete() {
@@ -484,33 +501,11 @@ function doDelete() {
 function doRefresh() {
   log('Обновление...');
   loadServers();
-  updateStatus();
-}
-
-function updateStatus() {
-  api('/api/status').then(function(st) {
-    console.log('[tcgui] status response:', JSON.stringify(st));
-    var state = st.state || 'disconnected';
-    document.getElementById('stState').textContent = state;
-    document.getElementById('stServer').textContent = st.serverId || '--';
-    var hs = document.getElementById('headerStatus');
-    var hd = document.getElementById('headerDot');
-    hd.className = 'dot ' + state;
-    if (state === 'connected') hs.textContent = 'Подключено';
-    else if (state === 'connecting') hs.textContent = 'Подключение...';
-    else if (state === 'error') hs.textContent = 'Ошибка';
-    else hs.textContent = 'Отключено';
-  }).catch(function() {
-    document.getElementById('stState').textContent = 'error';
-    document.getElementById('headerDot').className = 'dot error';
-    document.getElementById('headerStatus').textContent = 'Нет связи';
-  });
 }
 
 log('TunnelCraft Control запущен', 'ok');
 loadServers();
-updateStatus();
-setInterval(updateStatus, 5000);
+setStatusUI('disconnected', '');
 </script>
 </body>
 </html>`
