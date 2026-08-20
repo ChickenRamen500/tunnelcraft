@@ -20,9 +20,9 @@ import (
         "github.com/ChickenRamen500/tunnelcraft/core/internal/config"
         "github.com/ChickenRamen500/tunnelcraft/core/internal/engine"
         protos "github.com/ChickenRamen500/tunnelcraft/core/internal/proto"
-		"google.golang.org/protobuf/types/known/emptypb"
+                "google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/ChickenRamen500/tunnelcraft/core/internal/subscription"
+        "github.com/ChickenRamen500/tunnelcraft/core/internal/subscription"
 )
 
 // Server wraps the gRPC server and all service implementations.
@@ -708,10 +708,21 @@ func serverEntryToProto(s config.ServerEntry) *protos.Server {
         case "amneziawg":
                 pb.Protocol = protos.Protocol_PROTOCOL_AMNEZIAWG
                 if s.AmneziaConfig != nil {
+                        a := s.AmneziaConfig
                         pb.Amneziawg = &protos.AmneziaWGConfig{
-                                PrivateKey: s.AmneziaConfig.PrivateKey, PublicKey: s.AmneziaConfig.PublicKey,
-                                PresharedKey: s.AmneziaConfig.PresharedKey, LocalAddress: s.AmneziaConfig.LocalAddress,
-                                DnsServers: s.AmneziaConfig.DNSServers, Mtu: s.AmneziaConfig.MTU,
+                                PrivateKey: a.PrivateKey, PublicKey: a.PublicKey,
+                                PresharedKey: a.PresharedKey, LocalAddress: a.LocalAddress,
+                                DnsServers: a.DNSServers, Mtu: a.MTU,
+                                Jc: a.Jc, Jmin: a.Jmin, Jmax: a.Jmax,
+                                S1: a.S1, S2: a.S2, S3: a.S3,
+                                H1: a.H1, H2: a.H2, H3: a.H3, H4: a.H4,
+                                HeaderProtectionKey: a.HeaderProtectionKey,
+                                ContentPaddingAddition: a.ContentPaddingAddition,
+                                RekeyAfterTime: a.RekeyAfterTime,
+                                RekeyTimeout: a.RekeyTimeout,
+                                RejectAfterTime: a.RejectAfterTime,
+                                KeepaliveTimeout: a.KeepaliveTimeout,
+                                MaxHandshakeAttempts: a.MaxHandshakeAttempts,
                         }
                 }
         }
@@ -858,10 +869,21 @@ func protoToServerEntry(pb *protos.Server) config.ServerEntry {
                 }
         }
         if pb.Amneziawg != nil {
+                a := pb.Amneziawg
                 entry.AmneziaConfig = &config.AmneziaConfigEntry{
-                        PrivateKey: pb.Amneziawg.PrivateKey, PublicKey: pb.Amneziawg.PublicKey,
-                        PresharedKey: pb.Amneziawg.PresharedKey, LocalAddress: pb.Amneziawg.LocalAddress,
-                        DNSServers: pb.Amneziawg.DnsServers, MTU: pb.Amneziawg.Mtu,
+                        PrivateKey: a.PrivateKey, PublicKey: a.PublicKey,
+                        PresharedKey: a.PresharedKey, LocalAddress: a.LocalAddress,
+                        DNSServers: a.DnsServers, MTU: a.Mtu,
+                        Jc: a.Jc, Jmin: a.Jmin, Jmax: a.Jmax,
+                        S1: a.S1, S2: a.S2, S3: a.S3,
+                        H1: a.H1, H2: a.H2, H3: a.H3, H4: a.H4,
+                        HeaderProtectionKey: a.HeaderProtectionKey,
+                        ContentPaddingAddition: a.ContentPaddingAddition,
+                        RekeyAfterTime: a.RekeyAfterTime,
+                        RekeyTimeout: a.RekeyTimeout,
+                        RejectAfterTime: a.RejectAfterTime,
+                        KeepaliveTimeout: a.KeepaliveTimeout,
+                        MaxHandshakeAttempts: a.MaxHandshakeAttempts,
                 }
         }
         return entry
@@ -903,8 +925,15 @@ func serverConfigToEntry(sc engine.ServerConfig) config.ServerEntry {
                         PresharedKey: sc.AmneziaPresharedKey, LocalAddress: sc.AmneziaLocalAddr,
                         DNSServers: sc.AmneziaDNS,
                         Jc: sc.AmneziaJc, Jmin: sc.AmneziaJmin, Jmax: sc.AmneziaJmax,
-                        S1: sc.AmneziaS1, S2: sc.AmneziaS2,
+                        S1: sc.AmneziaS1, S2: sc.AmneziaS2, S3: sc.AmneziaS3,
                         H1: sc.AmneziaH1, H2: sc.AmneziaH2, H3: sc.AmneziaH3, H4: sc.AmneziaH4,
+                        HeaderProtectionKey: sc.AmneziaHeaderProtectionKey,
+                        ContentPaddingAddition: sc.AmneziaContentPaddingAddition,
+                        RekeyAfterTime: sc.AmneziaRekeyAfterTime,
+                        RekeyTimeout: sc.AmneziaRekeyTimeout,
+                        RejectAfterTime: sc.AmneziaRejectAfterTime,
+                        KeepaliveTimeout: sc.AmneziaKeepaliveTimeout,
+                        MaxHandshakeAttempts: sc.AmneziaMaxHandshakeAttempts,
                 }
         }
         return entry

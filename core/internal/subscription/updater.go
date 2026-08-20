@@ -257,10 +257,18 @@ func serverConfigToEntry(s engine.ServerConfig) config.ServerEntry {
                         Jmax:         s.AmneziaJmax,
                         S1:           s.AmneziaS1,
                         S2:           s.AmneziaS2,
+                        S3:           s.AmneziaS3,
                         H1:           s.AmneziaH1,
                         H2:           s.AmneziaH2,
                         H3:           s.AmneziaH3,
                         H4:           s.AmneziaH4,
+                        HeaderProtectionKey:   s.AmneziaHeaderProtectionKey,
+                        ContentPaddingAddition: s.AmneziaContentPaddingAddition,
+                        RekeyAfterTime: s.AmneziaRekeyAfterTime,
+                        RekeyTimeout: s.AmneziaRekeyTimeout,
+                        RejectAfterTime: s.AmneziaRejectAfterTime,
+                        KeepaliveTimeout: s.AmneziaKeepaliveTimeout,
+                        MaxHandshakeAttempts: s.AmneziaMaxHandshakeAttempts,
                 }
         }
 

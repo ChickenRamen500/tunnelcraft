@@ -188,16 +188,44 @@ message ShadowsocksConfig {
 }
 
 // AmneziaWG-specific configuration fields.
+// Supports both AWG2 (junk packet parameters) and AWG3 (string H1-H4 ranges,
+// header protection key, content padding, timing fields).
 message AmneziaWGConfig {
+  // Core WireGuard-like fields.
   string private_key   = 1;
   string public_key    = 2;
   string preshared_key = 3;
   string local_address = 4;
   string dns_servers   = 5;
   uint32 mtu           = 6;
-  string junk_pkt_count     = 7;
-  string junk_pkt_size      = 8;
-  string init_magic_header  = 9;
+
+  // Junk packet parameters (AWG2 & AWG3).
+  uint32 jc   = 7;
+  uint32 jmin = 8;
+  uint32 jmax = 9;
+
+  // Magic header sizes — S1/S2 for init packets, S3 for cookie response packets.
+  uint32 s1 = 10;
+  uint32 s2 = 11;
+  uint32 s3 = 12;
+
+  // Header transformation markers (strings to support both AWG2 numeric
+  // and AWG3 range syntax: "0xff-0xffff", "[deadbeef]", "<12>", "{8}", "(6)", "t").
+  string h1 = 13;
+  string h2 = 14;
+  string h3 = 15;
+  string h4 = 16;
+
+  // AWG3-specific fields.
+  string header_protection_key    = 17;
+  string content_padding_addition = 18;
+
+  // AWG3 timing fields (range strings, e.g. "120", "120-180").
+  string rekey_after_time       = 19;
+  string rekey_timeout          = 20;
+  string reject_after_time      = 21;
+  string keepalive_timeout      = 22;
+  string max_handshake_attempts = 23;
 }
 
 // SSH tunnel-specific configuration fields.

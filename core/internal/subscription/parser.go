@@ -518,6 +518,7 @@ func parseWireGuard(raw string) (engine.ServerConfig, error) {
 // ---------------------------------------------------------------------------
 
 // awgConfigJSON extends the wgConfigJSON with AmneziaWG junk-packet parameters.
+// H1-H4 are strings to support both AWG2 numeric and AWG3 range expressions.
 type awgConfigJSON struct {
         wgConfigJSON
         Jc   uint32 `json:"jc"`
@@ -525,14 +526,23 @@ type awgConfigJSON struct {
         Jmax uint32 `json:"jmax"`
         S1   uint32 `json:"s1"`
         S2   uint32 `json:"s2"`
-        H1   uint32 `json:"h1"`
-        H2   uint32 `json:"h2"`
-        H3   uint32 `json:"h3"`
-        H4   uint32 `json:"h4"`
+        S3   uint32 `json:"s3"`
+        H1   string `json:"h1"`
+        H2   string `json:"h2"`
+        H3   string `json:"h3"`
+        H4   string `json:"h4"`
+        // AWG3-specific fields.
+        HeaderProtectionKey    string `json:"header_protection_key"`
+        ContentPaddingAddition string `json:"content_padding_addition"`
+        RekeyAfterTime        string `json:"rekey_after_time"`
+        RekeyTimeout          string `json:"rekey_timeout"`
+        RejectAfterTime       string `json:"reject_after_time"`
+        KeepaliveTimeout      string `json:"keepalive_timeout"`
+        MaxHandshakeAttempts  string `json:"max_handshake_attempts"`
 }
 
 // parseAmneziaWG is identical to parseWireGuard but also extracts the
-// AmneziaWG junk-packet fields (Jc, Jmin, Jmax, S1, S2, H1–H4).
+// AmneziaWG junk-packet fields (Jc, Jmin, Jmax, S1, S2, S3, H1–H4) plus AWG3 fields.
 func parseAmneziaWG(raw string) (engine.ServerConfig, error) {
         var cfg engine.ServerConfig
         cfg.ID = uuid.New().String()
@@ -566,10 +576,19 @@ func parseAmneziaWG(raw string) (engine.ServerConfig, error) {
                         cfg.AmneziaJmax = a.Jmax
                         cfg.AmneziaS1 = a.S1
                         cfg.AmneziaS2 = a.S2
+                        cfg.AmneziaS3 = a.S3
                         cfg.AmneziaH1 = a.H1
                         cfg.AmneziaH2 = a.H2
                         cfg.AmneziaH3 = a.H3
                         cfg.AmneziaH4 = a.H4
+                        // AWG3 fields.
+                        cfg.AmneziaHeaderProtectionKey = a.HeaderProtectionKey
+                        cfg.AmneziaContentPaddingAddition = a.ContentPaddingAddition
+                        cfg.AmneziaRekeyAfterTime = a.RekeyAfterTime
+                        cfg.AmneziaRekeyTimeout = a.RekeyTimeout
+                        cfg.AmneziaRejectAfterTime = a.RejectAfterTime
+                        cfg.AmneziaKeepaliveTimeout = a.KeepaliveTimeout
+                        cfg.AmneziaMaxHandshakeAttempts = a.MaxHandshakeAttempts
 
                         if a.Endpoint != "" {
                                 h, p, pErr := netSplitHostPort(a.Endpoint)
@@ -609,10 +628,20 @@ func parseAmneziaWG(raw string) (engine.ServerConfig, error) {
         cfg.AmneziaJmax = parseUint32Q(query, "jmax")
         cfg.AmneziaS1 = parseUint32Q(query, "s1")
         cfg.AmneziaS2 = parseUint32Q(query, "s2")
-        cfg.AmneziaH1 = parseUint32Q(query, "h1")
-        cfg.AmneziaH2 = parseUint32Q(query, "h2")
-        cfg.AmneziaH3 = parseUint32Q(query, "h3")
-        cfg.AmneziaH4 = parseUint32Q(query, "h4")
+        cfg.AmneziaS3 = parseUint32Q(query, "s3")
+        // H1-H4: read as strings (supports AWG2 numeric and AWG3 range syntax).
+        cfg.AmneziaH1 = query.Get("h1")
+        cfg.AmneziaH2 = query.Get("h2")
+        cfg.AmneziaH3 = query.Get("h3")
+        cfg.AmneziaH4 = query.Get("h4")
+        // AWG3 fields from query.
+        cfg.AmneziaHeaderProtectionKey = query.Get("header_protection_key")
+        cfg.AmneziaContentPaddingAddition = query.Get("content_padding_addition")
+        cfg.AmneziaRekeyAfterTime = query.Get("rekey_after_time")
+        cfg.AmneziaRekeyTimeout = query.Get("rekey_timeout")
+        cfg.AmneziaRejectAfterTime = query.Get("reject_after_time")
+        cfg.AmneziaKeepaliveTimeout = query.Get("keepalive_timeout")
+        cfg.AmneziaMaxHandshakeAttempts = query.Get("max_handshake_attempts")
 
         return cfg, nil
 }
@@ -672,11 +701,63 @@ func ParseWireGuardConf(text string) (engine.ServerConfig, error) {
                                         // MTU stored but not used directly (wireguard-go handles it)
                                         _ = mtu
                                 }
-                        case "Jc", "Jmin", "Jmax", "S1", "S2", "H1", "H2", "H3", "H4", "I1", "I2", "I3":
-                                // AmneziaWG parameters detected - switch protocol
+                        case "Jc":
                                 cfg.Protocol = engine.ProtocolAmneziaWG
                                 cfg.AmneziaPrivateKey = cfg.WGPrivateKey
                                 cfg.WGPrivateKey = ""
+                                if n, err := strconv.ParseUint(value, 10, 32); err == nil {
+                                        cfg.AmneziaJc = uint32(n)
+                                }
+                        case "Jmin":
+                                if n, err := strconv.ParseUint(value, 10, 32); err == nil {
+                                        cfg.AmneziaJmin = uint32(n)
+                                }
+                        case "Jmax":
+                                if n, err := strconv.ParseUint(value, 10, 32); err == nil {
+                                        cfg.AmneziaJmax = uint32(n)
+                                }
+                        case "S1":
+                                if n, err := strconv.ParseUint(value, 10, 32); err == nil {
+                                        cfg.AmneziaS1 = uint32(n)
+                                }
+                        case "S2":
+                                if n, err := strconv.ParseUint(value, 10, 32); err == nil {
+                                        cfg.AmneziaS2 = uint32(n)
+                                }
+                        case "S3":
+                                if n, err := strconv.ParseUint(value, 10, 32); err == nil {
+                                        cfg.AmneziaS3 = uint32(n)
+                                }
+                        case "H1":
+                                cfg.Protocol = engine.ProtocolAmneziaWG
+                                if cfg.AmneziaPrivateKey == "" {
+                                        cfg.AmneziaPrivateKey = cfg.WGPrivateKey
+                                        cfg.WGPrivateKey = ""
+                                }
+                                cfg.AmneziaH1 = value
+                        case "H2":
+                                cfg.AmneziaH2 = value
+                        case "H3":
+                                cfg.AmneziaH3 = value
+                        case "H4":
+                                cfg.AmneziaH4 = value
+                        case "I1", "I2", "I3":
+                                // Legacy AWG timing fields - ignored
+                                _ = value
+                        case "HeaderProtectionKey":
+                                cfg.AmneziaHeaderProtectionKey = value
+                        case "ContentPaddingAddition":
+                                cfg.AmneziaContentPaddingAddition = value
+                        case "RekeyAfterTime":
+                                cfg.AmneziaRekeyAfterTime = value
+                        case "RekeyTimeout":
+                                cfg.AmneziaRekeyTimeout = value
+                        case "RejectAfterTime":
+                                cfg.AmneziaRejectAfterTime = value
+                        case "KeepaliveTimeout":
+                                cfg.AmneziaKeepaliveTimeout = value
+                        case "MaxHandshakeAttempts":
+                                cfg.AmneziaMaxHandshakeAttempts = value
                         }
                 }
 
@@ -756,6 +837,8 @@ func parseSingBox(data []byte) ([]engine.ServerConfig, []ParseError) {
                         cfg, err = parseSingBoxHysteria2(raw)
                 case "wireguard":
                         cfg, err = parseSingBoxWireGuard(raw)
+                case "amnezia-wg":
+                        cfg, err = parseSingBoxAmneziaWG(raw)
                 default:
                         // Unsupported outbound type – skip silently.
                         continue
@@ -990,6 +1073,73 @@ func parseSingBoxWireGuard(raw json.RawMessage) (engine.ServerConfig, error) {
         return cfg, nil
 }
 
+// ---------- sing-box AmneziaWG ----------
+
+type sbAmneziaWG struct {
+        Server        string   `json:"server"`
+        ServerPort    uint32   `json:"server_port"`
+        PrivateKey    string   `json:"private_key"`
+        PeerPublicKey string   `json:"peer_public_key"`
+        PreSharedKey  string   `json:"pre_shared_key"`
+        LocalAddress  []string `json:"local_address"`
+        // AmneziaWG junk parameters.
+        Jc   uint32 `json:"jc"`
+        Jmin uint32 `json:"jmin"`
+        Jmax uint32 `json:"jmax"`
+        S1   uint32 `json:"s1"`
+        S2   uint32 `json:"s2"`
+        S3   uint32 `json:"s3"`
+        H1   string `json:"h1"`
+        H2   string `json:"h2"`
+        H3   string `json:"h3"`
+        H4   string `json:"h4"`
+        // AWG3 fields.
+        HeaderProtectionKey    string `json:"header_protection_key"`
+        ContentPaddingAddition string `json:"content_padding_addition"`
+        RekeyAfterTime        string `json:"rekey_after_time"`
+        RekeyTimeout          string `json:"rekey_timeout"`
+        RejectAfterTime       string `json:"reject_after_time"`
+        KeepaliveTimeout      string `json:"keepalive_timeout"`
+        MaxHandshakeAttempts  string `json:"max_handshake_attempts"`
+}
+
+func parseSingBoxAmneziaWG(raw json.RawMessage) (engine.ServerConfig, error) {
+        var w sbAmneziaWG
+        if err := json.Unmarshal(raw, &w); err != nil {
+                return engine.ServerConfig{}, err
+        }
+
+        cfg := engine.ServerConfig{
+                ID:              uuid.New().String(),
+                Protocol:        engine.ProtocolAmneziaWG,
+                Host:            w.Server,
+                Port:            w.ServerPort,
+                AmneziaPrivateKey: w.PrivateKey,
+                AmneziaPublicKey:  w.PeerPublicKey,
+                AmneziaPresharedKey: w.PreSharedKey,
+                AmneziaLocalAddr: strings.Join(w.LocalAddress, ","),
+                AmneziaJc:       w.Jc,
+                AmneziaJmin:     w.Jmin,
+                AmneziaJmax:     w.Jmax,
+                AmneziaS1:       w.S1,
+                AmneziaS2:       w.S2,
+                AmneziaS3:       w.S3,
+                AmneziaH1:       w.H1,
+                AmneziaH2:       w.H2,
+                AmneziaH3:       w.H3,
+                AmneziaH4:       w.H4,
+                AmneziaHeaderProtectionKey: w.HeaderProtectionKey,
+                AmneziaContentPaddingAddition: w.ContentPaddingAddition,
+                AmneziaRekeyAfterTime: w.RekeyAfterTime,
+                AmneziaRekeyTimeout: w.RekeyTimeout,
+                AmneziaRejectAfterTime: w.RejectAfterTime,
+                AmneziaKeepaliveTimeout: w.KeepaliveTimeout,
+                AmneziaMaxHandshakeAttempts: w.MaxHandshakeAttempts,
+        }
+
+        return cfg, nil
+}
+
 // ---------------------------------------------------------------------------
 // SIP008 parser
 // ---------------------------------------------------------------------------
@@ -1114,10 +1264,19 @@ type clashProxy struct {
         Jmax uint32 `yaml:"jmax"`
         S1   uint32 `yaml:"s1"`
         S2   uint32 `yaml:"s2"`
-        H1   uint32 `yaml:"h1"`
-        H2   uint32 `yaml:"h2"`
-        H3   uint32 `yaml:"h3"`
-        H4   uint32 `yaml:"h4"`
+        S3   uint32 `yaml:"s3"`
+        H1   string `yaml:"h1"`
+        H2   string `yaml:"h2"`
+        H3   string `yaml:"h3"`
+        H4   string `yaml:"h4"`
+        // AWG3 extras.
+        HeaderProtectionKey   string `yaml:"header-protection-key"`
+        ContentPaddingAddition string `yaml:"content-padding-addition"`
+        RekeyAfterTime        string `yaml:"rekey-after-time"`
+        RekeyTimeout          string `yaml:"rekey-timeout"`
+        RejectAfterTime       string `yaml:"reject-after-time"`
+        KeepaliveTimeout      string `yaml:"keepalive-timeout"`
+        MaxHandshakeAttempts  string `yaml:"max-handshake-attempts"`
 
         // VLESS flow.
         Flow string `yaml:"flow"`
@@ -1230,10 +1389,18 @@ func clashProxyToConfig(p *clashProxy) (engine.ServerConfig, error) {
                 cfg.AmneziaJmax = p.Jmax
                 cfg.AmneziaS1 = p.S1
                 cfg.AmneziaS2 = p.S2
+                cfg.AmneziaS3 = p.S3
                 cfg.AmneziaH1 = p.H1
                 cfg.AmneziaH2 = p.H2
                 cfg.AmneziaH3 = p.H3
                 cfg.AmneziaH4 = p.H4
+                cfg.AmneziaHeaderProtectionKey = p.HeaderProtectionKey
+                cfg.AmneziaContentPaddingAddition = p.ContentPaddingAddition
+                cfg.AmneziaRekeyAfterTime = p.RekeyAfterTime
+                cfg.AmneziaRekeyTimeout = p.RekeyTimeout
+                cfg.AmneziaRejectAfterTime = p.RejectAfterTime
+                cfg.AmneziaKeepaliveTimeout = p.KeepaliveTimeout
+                cfg.AmneziaMaxHandshakeAttempts = p.MaxHandshakeAttempts
 
         default:
                 return engine.ServerConfig{}, fmt.Errorf("unsupported clash proxy type: %s", p.Type)

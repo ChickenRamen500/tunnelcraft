@@ -12,6 +12,7 @@ import (
 
 // AmneziaHandler manages the amnezia-wg.exe subprocess.
 // AmneziaWG (AWG) is a WireGuard fork with anti-DPI obfuscation.
+// Supports both AWG2 (junk-packet based) and AWG3 (header protection + timing).
 type AmneziaHandler struct {
 	*BaseHandler
 }
@@ -49,8 +50,70 @@ func (a *AmneziaHandler) Start(ctx context.Context, server *engine.ServerConfig,
 	return nil
 }
 
+// isAWG3 returns true if the server config contains any AWG3-specific field.
+func isAWG3(server *engine.ServerConfig) bool {
+	return server.AmneziaHeaderProtectionKey != "" ||
+		server.AmneziaContentPaddingAddition != "" ||
+		server.AmneziaRekeyAfterTime != "" ||
+		server.AmneziaRekeyTimeout != "" ||
+		server.AmneziaRejectAfterTime != "" ||
+		server.AmneziaKeepaliveTimeout != "" ||
+		server.AmneziaMaxHandshakeAttempts != ""
+}
+
+// writeCommonParams writes parameters shared by AWG2 and AWG3.
+func writeCommonParams(sb *strings.Builder, server *engine.ServerConfig) {
+	sb.WriteString(fmt.Sprintf("Jc = %d\n", server.AmneziaJc))
+	sb.WriteString(fmt.Sprintf("Jmin = %d\n", server.AmneziaJmin))
+	sb.WriteString(fmt.Sprintf("Jmax = %d\n", server.AmneziaJmax))
+	sb.WriteString(fmt.Sprintf("S1 = %d\n", server.AmneziaS1))
+	sb.WriteString(fmt.Sprintf("S2 = %d\n", server.AmneziaS2))
+	if server.AmneziaS3 > 0 {
+		sb.WriteString(fmt.Sprintf("S3 = %d\n", server.AmneziaS3))
+	}
+	// H1-H4: written as strings. The AWG binary accepts both numeric strings
+	// (AWG2: "1") and AWG3 range expressions ("0xff-0xffff", "[deadbeef]", etc.).
+	if server.AmneziaH1 != "" {
+		sb.WriteString(fmt.Sprintf("H1 = %s\n", server.AmneziaH1))
+	}
+	if server.AmneziaH2 != "" {
+		sb.WriteString(fmt.Sprintf("H2 = %s\n", server.AmneziaH2))
+	}
+	if server.AmneziaH3 != "" {
+		sb.WriteString(fmt.Sprintf("H3 = %s\n", server.AmneziaH3))
+	}
+	if server.AmneziaH4 != "" {
+		sb.WriteString(fmt.Sprintf("H4 = %s\n", server.AmneziaH4))
+	}
+}
+
+// writeAWG3Params writes AWG3-specific parameters (header protection, timing).
+func writeAWG3Params(sb *strings.Builder, server *engine.ServerConfig) {
+	if server.AmneziaHeaderProtectionKey != "" {
+		sb.WriteString(fmt.Sprintf("HeaderProtectionKey = %s\n", server.AmneziaHeaderProtectionKey))
+	}
+	if server.AmneziaContentPaddingAddition != "" {
+		sb.WriteString(fmt.Sprintf("ContentPaddingAddition = %s\n", server.AmneziaContentPaddingAddition))
+	}
+	if server.AmneziaRekeyAfterTime != "" {
+		sb.WriteString(fmt.Sprintf("RekeyAfterTime = %s\n", server.AmneziaRekeyAfterTime))
+	}
+	if server.AmneziaRekeyTimeout != "" {
+		sb.WriteString(fmt.Sprintf("RekeyTimeout = %s\n", server.AmneziaRekeyTimeout))
+	}
+	if server.AmneziaRejectAfterTime != "" {
+		sb.WriteString(fmt.Sprintf("RejectAfterTime = %s\n", server.AmneziaRejectAfterTime))
+	}
+	if server.AmneziaKeepaliveTimeout != "" {
+		sb.WriteString(fmt.Sprintf("KeepaliveTimeout = %s\n", server.AmneziaKeepaliveTimeout))
+	}
+	if server.AmneziaMaxHandshakeAttempts != "" {
+		sb.WriteString(fmt.Sprintf("MaxHandshakeAttempts = %s\n", server.AmneziaMaxHandshakeAttempts))
+	}
+}
+
 // generateConfig creates an AmneziaWG config file from the server config.
-// AmneziaWG uses the same format as WireGuard but adds junk packet parameters.
+// Produces AWG2 or AWG3 format depending on which fields are populated.
 func (a *AmneziaHandler) generateConfig(server *engine.ServerConfig, socksPort uint32) (string, error) {
 	dnsServers := server.AmneziaDNS
 	if dnsServers == "" {
@@ -64,20 +127,13 @@ func (a *AmneziaHandler) generateConfig(server *engine.ServerConfig, socksPort u
 	sb.WriteString(fmt.Sprintf("Address = %s\n", server.AmneziaLocalAddr))
 	sb.WriteString(fmt.Sprintf("DNS = %s\n", dnsServers))
 
-	// AmneziaWG-specific junk packet parameters
-	// Jc = number of junk packets
-	// Jmin/Jmax = min/max size of junk packets
-	// S1/S2 = magic header sizes
-	// H1-H4 = handshake packet type markers
-	sb.WriteString(fmt.Sprintf("Jc = %d\n", server.AmneziaJc))
-	sb.WriteString(fmt.Sprintf("Jmin = %d\n", server.AmneziaJmin))
-	sb.WriteString(fmt.Sprintf("Jmax = %d\n", server.AmneziaJmax))
-	sb.WriteString(fmt.Sprintf("S1 = %d\n", server.AmneziaS1))
-	sb.WriteString(fmt.Sprintf("S2 = %d\n", server.AmneziaS2))
-	sb.WriteString(fmt.Sprintf("H1 = %d\n", server.AmneziaH1))
-	sb.WriteString(fmt.Sprintf("H2 = %d\n", server.AmneziaH2))
-	sb.WriteString(fmt.Sprintf("H3 = %d\n", server.AmneziaH3))
-	sb.WriteString(fmt.Sprintf("H4 = %d\n", server.AmneziaH4))
+	// Write common AWG params (junk packets, S1-S4, H1-H4).
+	writeCommonParams(&sb, server)
+
+	// Write AWG3-specific params if present.
+	if isAWG3(server) {
+		writeAWG3Params(&sb, server)
+	}
 
 	sb.WriteString("\n[Peer]\n")
 	sb.WriteString(fmt.Sprintf("# %s\n", server.Name))
