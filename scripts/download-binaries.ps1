@@ -189,33 +189,72 @@ if (-not (Test-Path $wgExe)) {
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 5. amnezia-wg.exe — build from source if Go available
-#    AmneziaWG is a WireGuard fork; its CLI is similar to wireguard-go.
+# 5. amnezia-wg.exe — AmneziaWG binary (AWG2 + AWG3 support)
+#    The repo amnezia-vpn/amneziawg-windows has NO releases.
+#    Options: copy from AmneziaVPN install, build from source, or manual.
 # ------------------------------------------------------------------
 Write-Host "[5/5] amnezia-wg.exe" -ForegroundColor Yellow
 $awgExe = Join-Path $BinDir "amnezia-wg.exe"
-$goCmd = Get-Command go -ErrorAction SilentlyContinue
-if ($goCmd) {
-    try {
-        $env:GOOS = "windows"
-        $env:GOARCH = "amd64"
-        & go install github.com/amnezia-vpn/amnezia-wg/cmd/amnezia-wg@latest 2>&1 | Out-Null
-        $goPath = (& go env GOPATH 2>$null)
-        if ($goPath) {
-            $builtExe = Join-Path $goPath "bin\amnezia-wg.exe"
-            if (Test-Path $builtExe) {
-                Copy-Item $builtExe $awgExe -Force
-                $sz = [math]::Round((Get-Item $awgExe).Length / 1MB, 2)
-                Write-Host "  [OK] amnezia-wg.exe built from source ($sz MB)" -ForegroundColor Green
-            } else {
-                Write-Host "  [WARN] amnezia-wg build produced no binary" -ForegroundColor DarkYellow
-            }
+$awgFound = $false
+
+# Check if already in bin/
+if (Test-Path $awgExe) {
+    $sz = [math]::Round((Get-Item $awgExe).Length / 1MB, 2)
+    Write-Host "  [OK] amnezia-wg.exe already in bin/ ($sz MB)" -ForegroundColor Green
+    $awgFound = $true
+}
+
+# Try copying from AmneziaVPN installation
+if (-not $awgFound) {
+    $awgSystemPaths = @(
+        "C:\Program Files\AmneziaVPN\amnezia-wg.exe",
+        "C:\Program Files\AmneziaVPN\resources\amnezia-wg.exe",
+        "C:\Program Files (x86)\AmneziaVPN\amnezia-wg.exe"
+    )
+    foreach ($p in $awgSystemPaths) {
+        if (Test-Path $p) {
+            Copy-Item $p $awgExe -Force
+            $sz = [math]::Round((Get-Item $awgExe).Length / 1MB, 2)
+            Write-Host "  [OK] amnezia-wg.exe copied from AmneziaVPN install ($sz MB)" -ForegroundColor Green
+            $awgFound = $true
+            break
         }
-    } catch {
-        Write-Host "  [WARN] amnezia-wg build failed: $($_.Exception.Message)" -ForegroundColor DarkYellow
     }
-} else {
-    Write-Host "  [SKIP] amnezia-wg.exe — Go not found, cannot build from source" -ForegroundColor DarkYellow
+}
+
+# Try building from source if Go is available
+if (-not $awgFound) {
+    $goCmd = Get-Command go -ErrorAction SilentlyContinue
+    if ($goCmd) {
+        Write-Host "  Attempting to build amnezia-wg from source..." -ForegroundColor DarkGray
+        try {
+            $env:GOOS = "windows"
+            $env:GOARCH = "amd64"
+            & go install github.com/amnezia-vpn/amnezia-wg/cmd/amnezia-wg@latest 2>&1 | Out-Null
+            $goPath = (& go env GOPATH 2>$null)
+            if ($goPath) {
+                $builtExe = Join-Path $goPath "bin\amnezia-wg.exe"
+                if (Test-Path $builtExe) {
+                    Copy-Item $builtExe $awgExe -Force
+                    $sz = [math]::Round((Get-Item $awgExe).Length / 1MB, 2)
+                    Write-Host "  [OK] amnezia-wg.exe built from source ($sz MB)" -ForegroundColor Green
+                    $awgFound = $true
+                } else {
+                    Write-Host "  [WARN] amnezia-wg build produced no binary" -ForegroundColor DarkYellow
+                }
+            }
+        } catch {
+            Write-Host "  [WARN] amnezia-wg build failed: $($_.Exception.Message)" -ForegroundColor DarkYellow
+        }
+    }
+}
+
+if (-not $awgFound) {
+    Write-Host "  [SKIP] amnezia-wg.exe not found." -ForegroundColor DarkYellow
+    Write-Host "         Options:" -ForegroundColor DarkYellow
+    Write-Host "         1. Copy from AmneziaVPN install to bin\amnezia-wg.exe" -ForegroundColor DarkYellow
+    Write-Host "         2. go install github.com/amnezia-vpn/amnezia-wg/cmd/amnezia-wg@latest" -ForegroundColor DarkYellow
+    Write-Host "         3. Manually place amnezia-wg.exe in the bin/ folder" -ForegroundColor DarkYellow
 }
 Write-Host ""
 
