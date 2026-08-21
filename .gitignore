@@ -4,22 +4,18 @@ target/
 **/target/
 
 # Dependencies
-**/node_modules/
-**/.venv/
-**/venv/
-**/__pycache__/
-**/.mypy_cache/
-**/.pytest_cache/
-**/.gradle/
-
-# Tauri-specific
-**/src-tauri/target/
+Cargo.lock
 **/Cargo.lock
+
+# Tauri specific
+.ui/
+**/.ui/
+.svelte-kit/
+**/.svelte-kit/
 
 # Logs and temp files
 *.log
 *.tmp
-*.swp
 
 # Environment
 .env
@@ -40,4 +36,40 @@ Thumbs.db
 coverage/
 htmlcov/
 .coverage
+
+# Python (if applicable)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.tox/
+.nox/
+.pytest_cache/
+.mypy_cache/
+.hypothesis/
+
+# Node.js (if applicable)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp/
+.pnp.js
+.next/
+.nuxt/
+.vuepress/dist/
+.static/
+.postcss-cache/
+
+# Rust specific
+Cargo.lock
+**/Cargo.lock
 ```

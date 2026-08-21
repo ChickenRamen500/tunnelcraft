@@ -73,7 +73,7 @@ fn get_daemon_status() -> serde_json::Value {
 pub fn run() {
     // Try to spawn the daemon
     let daemon_started = match spawn_daemon() {
-        Ok(child) => {
+        Ok(mut child) => {
             println!("[tauri] tunnelcraftd.exe spawned successfully");
             // Wait for daemon to be ready
             if wait_for_daemon_ready(20) {
