@@ -639,3 +639,8 @@ func (h *HTTPServer) handleLogs(w http.ResponseWriter, req *http.Request) {
                 "count": len(logLines),
         })
 }
+
+// isConfFile checks if the content looks like a WireGuard/AmneziaWG .conf file.
+func isConfFile(content string) bool {
+        return strings.Contains(content, "[Interface]") && strings.Contains(content, "[Peer]")
+}
