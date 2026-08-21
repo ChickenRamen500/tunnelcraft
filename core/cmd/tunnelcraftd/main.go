@@ -48,7 +48,7 @@ func main() {
                 *dataDir = filepath.Join(baseDir, "data")
         }
         if *binDir == "" {
-                *binDir = filepath.Join(baseDir, "bin")
+                *binDir = baseDir // binaries are in the same directory as tunnelcraftd.exe
         }
 
         // Ensure directories exist
@@ -112,7 +112,7 @@ func main() {
                 engine.ProtocolVMESS:     protocols.NewXrayHandler(filepath.Join(*binDir, "xray-core.exe")),
                 engine.ProtocolWireGuard: protocols.NewWireGuardHandler(wireguardExePath),
                 engine.ProtocolHysteria:  protocols.NewHysteriaHandler(filepath.Join(*binDir, "hysteria.exe")),
-                engine.ProtocolAmneziaWG: protocols.NewAmneziaHandler(filepath.Join(*binDir, "amnezia-wg.exe")),
+                engine.ProtocolAmneziaWG: protocols.NewAmneziaHandler(filepath.Join(*binDir, "amneziawg-go.exe")),
         }
 
         // 2. Connection manager

@@ -14,8 +14,6 @@ import (
 )
 
 // BaseHandler provides common subprocess management for all protocol wrappers.
-// Each specific protocol (xray, wireguard, hysteria, amnezia) embeds this
-// and implements the protocol-specific config generation.
 type BaseHandler struct {
 	mu        sync.Mutex
 	name      string
@@ -82,13 +80,10 @@ func (b *BaseHandler) Stop() error {
 
 	if b.cmd != nil && b.cmd.Process != nil {
 		if b.cmd.ProcessState == nil || !b.cmd.ProcessState.Exited() {
-			// Try graceful shutdown first
 			if err := b.cmd.Process.Signal(os.Interrupt); err != nil {
-				// Fall back to kill
 				_ = b.cmd.Process.Kill()
 			}
 
-			// Wait briefly for cleanup
 			done := make(chan error, 1)
 			go func() {
 				done <- b.cmd.Wait()
@@ -112,7 +107,6 @@ func (b *BaseHandler) launchProcess(ctx context.Context, args []string, configPa
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	// Check binary exists
 	if b.binPath == "" {
 		return fmt.Errorf("%s: binary path not set", b.name)
 	}
@@ -123,14 +117,16 @@ func (b *BaseHandler) launchProcess(ctx context.Context, args []string, configPa
 	ctx, cancel := context.WithCancel(ctx)
 	b.cancel = cancel
 
-		absBin, absErr := filepath.Abs(b.binPath)
+	absBin, absErr := filepath.Abs(b.binPath)
 	if absErr == nil {
 		b.binPath = absBin
 	}
-	b.cmd = exec.CommandContext(ctx, b.binPath, args...)
-	b.cmd.Dir = filepath.Dir(configPath)
 
-	// Capture stdout and stderr for logging
+	b.cmd = exec.CommandContext(ctx, b.binPath, args...)
+
+	// Set working directory to binary directory so wintun.dll can be found.
+	b.cmd.Dir = filepath.Dir(b.binPath)
+
 	stdoutPipe, err := b.cmd.StdoutPipe()
 	if err != nil {
 		cancel()
@@ -142,7 +138,6 @@ func (b *BaseHandler) launchProcess(ctx context.Context, args []string, configPa
 		return fmt.Errorf("%s: failed to create stderr pipe: %w", b.name, err)
 	}
 
-	// Start the process
 	if err := b.cmd.Start(); err != nil {
 		cancel()
 		return fmt.Errorf("%s: failed to start process: %w", b.name, err)
@@ -150,22 +145,28 @@ func (b *BaseHandler) launchProcess(ctx context.Context, args []string, configPa
 
 	b.startedAt = time.Now()
 
-	// Read logs in background
 	go b.readLogs(stdoutPipe, "stdout")
 	go b.readLogs(stderrPipe, "stderr")
+
+	// Monitor process exit to log the exit code.
+	go func() {
+		err := b.cmd.Wait()
+		if b.cmd.ProcessState != nil {
+			log.Printf("[%s] process exited with code: %d, error: %v", b.name, b.cmd.ProcessState.ExitCode(), err)
+		}
+	}()
 
 	return nil
 }
 
 // readLogs continuously reads from a pipe and appends to the log buffer.
 func (b *BaseHandler) readLogs(pipe interface{ Read([]byte) (int, error) }, prefix string) {
-	// Use a simple line reader
 	buf := make([]byte, 4096)
 	for {
 		n, err := pipe.Read(buf)
 		if n > 0 {
 			line := fmt.Sprintf("[%s] %s", prefix, string(buf[:n]))
-fmt.Fprintf(os.Stderr, "[%s] [%s] %s", b.name, prefix, string(buf[:n]))
+			fmt.Fprintf(os.Stderr, "[%s] [%s] %s", b.name, prefix, string(buf[:n]))
 			b.mu.Lock()
 			if len(b.logBuffer) >= b.maxLogs {
 				b.logBuffer = b.logBuffer[len(b.logBuffer)/2:]
@@ -187,7 +188,7 @@ func (b *BaseHandler) StartedAt() time.Time {
 	return b.startedAt
 }
 
-// appendLog adds a log line (used by specific handlers for their own messages).
+// appendLog adds a log line.
 func (b *BaseHandler) appendLog(format string, args ...interface{}) {
 	b.mu.Lock()
 	defer b.mu.Unlock()

@@ -189,33 +189,33 @@ if (-not (Test-Path $wgExe)) {
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 5. amnezia-wg.exe — AmneziaWG binary (AWG2 + AWG3 support)
-#    Clone and build from amnezia-vpn/amnezia-wg repository
-#    main.go is at the ROOT of the repo, NOT in cmd/
+# 5. amneziawg-go.exe — AmneziaWG binary (AWG2 + AWG3 support)
+#    Clone and build from amnezia-vpn/amneziawg-go repository
+#    main.go and main_windows.go are at the ROOT of the repo
 # ------------------------------------------------------------------
-Write-Host "[5/5] amnezia-wg.exe" -ForegroundColor Yellow
-$awgExe = Join-Path $BinDir "amnezia-wg.exe"
+Write-Host "[5/5] amneziawg-go.exe" -ForegroundColor Yellow
+$awgExe = Join-Path $BinDir "amneziawg-go.exe"
 $awgFound = $false
 
 # Check if already in bin/
 if (Test-Path $awgExe) {
     $sz = [math]::Round((Get-Item $awgExe).Length / 1MB, 2)
-    Write-Host "  [OK] amnezia-wg.exe already in bin/ ($sz MB)" -ForegroundColor Green
+    Write-Host "  [OK] amneziawg-go.exe already in bin/ ($sz MB)" -ForegroundColor Green
     $awgFound = $true
 }
 
 # Try copying from AmneziaVPN installation
 if (-not $awgFound) {
     $awgSystemPaths = @(
-        "C:\Program Files\AmneziaVPN\amnezia-wg.exe",
-        "C:\Program Files\AmneziaVPN\resources\amnezia-wg.exe",
-        "C:\Program Files (x86)\AmneziaVPN\amnezia-wg.exe"
+        "C:\Program Files\AmneziaVPN\amneziawg-go.exe",
+        "C:\Program Files\AmneziaVPN\resources\amneziawg-go.exe",
+        "C:\Program Files (x86)\AmneziaVPN\amneziawg-go.exe"
     )
     foreach ($p in $awgSystemPaths) {
         if (Test-Path $p) {
             Copy-Item $p $awgExe -Force
             $sz = [math]::Round((Get-Item $awgExe).Length / 1MB, 2)
-            Write-Host "  [OK] amnezia-wg.exe copied from AmneziaVPN install ($sz MB)" -ForegroundColor Green
+            Write-Host "  [OK] amneziawg-go.exe copied from AmneziaVPN install ($sz MB)" -ForegroundColor Green
             $awgFound = $true
             break
         }
@@ -236,8 +236,8 @@ if (-not $awgFound) {
         try {
             if (Test-Path $tempDir) { Remove-Item -Recurse -Force $tempDir }
 
-            Write-Host "  git clone https://github.com/amnezia-vpn/amnezia-wg ..." -ForegroundColor DarkGray
-            $cloneOutput = & git clone --depth 1 https://github.com/amnezia-vpn/amnezia-wg $tempDir 2>&1
+            Write-Host "  git clone https://github.com/amnezia-vpn/amneziawg-go ..." -ForegroundColor DarkGray
+            $cloneOutput = & git clone --depth 1 https://github.com/amnezia-vpn/amneziawg-go $tempDir 2>&1
             if ($LASTEXITCODE -ne 0) {
                 Write-Host "  [FAIL] git clone failed:" -ForegroundColor Red
                 Write-Host "  $cloneOutput" -ForegroundColor Red
@@ -255,14 +255,14 @@ if (-not $awgFound) {
                     } else {
                         $env:GOOS = "windows"
                         $env:GOARCH = "amd64"
-                        $env:CGO_ENABLED = "0"
+                        Remove-Item Env:CGO_ENABLED -ErrorAction SilentlyContinue  # let Go auto-enable CGO for wintun
 
                         Write-Host "  Running: go build -v -o $awgExe ." -ForegroundColor DarkGray
                         $buildOutput = & go build -v -o $awgExe . 2>&1
 
                         if ($LASTEXITCODE -eq 0 -and (Test-Path $awgExe)) {
                             $sz = [math]::Round((Get-Item $awgExe).Length / 1MB, 2)
-                            Write-Host "  [OK] amnezia-wg.exe built from source ($sz MB)" -ForegroundColor Green
+                            Write-Host "  [OK] amneziawg-go.exe built from source ($sz MB)" -ForegroundColor Green
                             $awgFound = $true
                             $buildOk = $true
                         } else {
@@ -298,11 +298,11 @@ if (-not $awgFound) {
 }
 
 if (-not $awgFound) {
-    Write-Host "  [SKIP] amnezia-wg.exe not found." -ForegroundColor DarkYellow
+    Write-Host "  [SKIP] amneziawg-go.exe not found." -ForegroundColor DarkYellow
     Write-Host "         Options:" -ForegroundColor DarkYellow
-    Write-Host "         1. Copy from AmneziaVPN install to bin\amnezia-wg.exe" -ForegroundColor DarkYellow
+    Write-Host "         1. Copy from AmneziaVPN install to bin\amneziawg-go.exe" -ForegroundColor DarkYellow
     Write-Host "         2. Install Go 1.22+ and re-run this script (will auto-build)" -ForegroundColor DarkYellow
-    Write-Host "         3. Manually place amnezia-wg.exe in the bin/ folder" -ForegroundColor DarkYellow
+    Write-Host "         3. Manually place amneziawg-go.exe in the bin/ folder" -ForegroundColor DarkYellow
 }
 Write-Host ""
 
@@ -310,7 +310,7 @@ Write-Host ""
 # Summary
 # ------------------------------------------------------------------
 Write-Host "=== Summary ===" -ForegroundColor Cyan
-$required = @("xray-core.exe", "hysteria.exe", "wintun.dll", "wireguard.exe", "amnezia-wg.exe")
+$required = @("xray-core.exe", "hysteria.exe", "wintun.dll", "wireguard.exe", "amneziawg-go.exe")
 $ok = 0
 $fail = 0
 foreach ($f in $required) {
