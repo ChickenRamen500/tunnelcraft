@@ -28,16 +28,6 @@ export default function App() {
     getConnectionStatus().then(setStatus).catch(console.error);
   });
 
-  const renderPage = () => {
-    switch (activeTab) {
-      case "dashboard": return <Dashboard />;
-      case "servers": return <Servers />;
-      case "subscriptions": return <Subscriptions />;
-      case "split-tunnel": return <SplitTunnel />;
-      case "settings": return <SettingsPage />;
-    }
-  };
-
   return (
     <div className="h-screen w-screen flex flex-col bg-[var(--bg-primary)] select-none">
       {/* Title bar (draggable area) */}
@@ -80,15 +70,29 @@ export default function App() {
           <div className="px-4 py-2 text-xs text-[var(--text-muted)]">v0.1.0</div>
         </nav>
 
-        {/* Main content */}
-        <main className="flex-1 overflow-hidden">
-          {renderPage()}
+        {/* Main content — all pages mounted, inactive ones hidden */}
+        <main className="flex-1 overflow-hidden relative">
+          <div className={activeTab === "dashboard" ? "contents" : "hidden"}>
+            <Dashboard />
+          </div>
+          <div className={activeTab === "servers" ? "contents" : "hidden"}>
+            <Servers />
+          </div>
+          <div className={activeTab === "subscriptions" ? "contents" : "hidden"}>
+            <Subscriptions />
+          </div>
+          <div className={activeTab === "split-tunnel" ? "contents" : "hidden"}>
+            <SplitTunnel />
+          </div>
+          <div className={activeTab === "settings" ? "contents" : "hidden"}>
+            <SettingsPage />
+          </div>
         </main>
       </div>
 
       {/* Footer */}
       <footer className="h-8 flex items-center justify-center border-t border-[var(--border-color)] text-xs text-[var(--text-muted)] flex-shrink-0">
-        TunnelCraft © 2025 · Все права защищены
+        TunnelCraft © 2025
       </footer>
     </div>
   );

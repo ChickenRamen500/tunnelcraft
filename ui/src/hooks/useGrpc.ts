@@ -1,5 +1,5 @@
 // Tauri invoke wrapper for gRPC calls.
-import { invoke } from "@tauri-apps/api/core";
+// Falls back to mock data when running outside Tauri (e.g. in browser).
 
 export interface ConnectionStatus {
   state: string;
@@ -61,39 +61,98 @@ export interface Settings {
   theme: string;
 }
 
+// Check if we're running inside Tauri
+const isTauri = (): boolean => {
+  return typeof window !== "undefined" && "__TAURI__" in window;
+};
+
+// Lazy-loaded invoke function
+let _invoke: Function | null = null;
+async function getInvoke(): Promise<Function> {
+  if (_invoke) return _invoke;
+  if (!isTauri()) throw new Error("Not running in Tauri");
+  const mod = await import("@tauri-apps/api/core");
+  _invoke = mod.invoke;
+  return _invoke;
+}
+
+// Mock defaults
+const mockStatus: ConnectionStatus = {
+  state: "DISCONNECTED",
+  server_id: null,
+  mode: "SYSTEM",
+  socks_port: 1080,
+  http_port: 8080,
+  stats: { bytes_uploaded: 0, bytes_downloaded: 0, duration: null },
+};
+
+const mockSettings: Settings = {
+  proxy_mode: "SYSTEM",
+  socks_port: 1080,
+  http_port: 8080,
+  dns_servers: "1.1.1.1,8.8.8.8",
+  auto_connect: false,
+  connect_on_startup: false,
+  kill_switch: false,
+  split_tunneling: false,
+  allow_lan: false,
+  connection_timeout: 30,
+  reconnect_attempts: 3,
+  language: "ru",
+  theme: "dark",
+};
+
 export async function getConnectionStatus(): Promise<ConnectionStatus> {
+  if (!isTauri()) return mockStatus;
+  const invoke = await getInvoke();
   return invoke<ConnectionStatus>("get_connection_status");
 }
 
 export async function connectServer(serverId: string): Promise<any> {
+  if (!isTauri()) return { state: "CONNECTED", server_id: serverId };
+  const invoke = await getInvoke();
   return invoke("connect_server", { serverId });
 }
 
 export async function disconnectServer(force = false): Promise<any> {
+  if (!isTauri()) return { state: "DISCONNECTED" };
+  const invoke = await getInvoke();
   return invoke("disconnect_server", { force });
 }
 
 export async function listServers(): Promise<{ servers: Server[]; total: number }> {
+  if (!isTauri()) return { servers: [], total: 0 };
+  const invoke = await getInvoke();
   return invoke("list_servers");
 }
 
 export async function listSubscriptions(): Promise<{ subscriptions: Subscription[] }> {
+  if (!isTauri()) return { subscriptions: [] };
+  const invoke = await getInvoke();
   return invoke("list_subscriptions");
 }
 
 export async function refreshSubscription(id: string): Promise<any> {
+  if (!isTauri()) return { added: 0, updated: 0, removed: 0 };
+  const invoke = await getInvoke();
   return invoke("refresh_subscription", { id });
 }
 
 export async function getSettings(): Promise<Settings> {
+  if (!isTauri()) return { ...mockSettings };
+  const invoke = await getInvoke();
   return invoke<Settings>("get_settings");
 }
 
 export async function getRoutingRules(): Promise<any> {
+  if (!isTauri()) return { domain_strategy: "IPIfNonMatch", rules: [] };
+  const invoke = await getInvoke();
   return invoke("get_routing_rules");
 }
 
 export async function healthCheck(): Promise<{ healthy: boolean; version: string }> {
+  if (!isTauri()) return { healthy: true, version: "0.1.0" };
+  const invoke = await getInvoke();
   return invoke("health_check");
 }
 
