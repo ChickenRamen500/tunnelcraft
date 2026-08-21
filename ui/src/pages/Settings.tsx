@@ -1,20 +1,22 @@
 import { useEffect, useState } from "react";
 import { useConnectionStore } from "@/stores/connection";
-import { getSettings, saveSettings, type Settings } from "@/hooks/useGrpc";
-import { Shield, Globe, Zap, Monitor, Languages, Palette, RotateCcw } from "lucide-react";
+import { useSettingsStore } from "@/stores/settings";
+import { getSettings, saveSettings, type Settings } from "@/hooks/useApi";
+import { Shield, Globe, Zap, Monitor, Languages, Palette, RotateCcw, CheckCircle2 } from "lucide-react";
 
 export default function Settings() {
   const { status } = useConnectionStore();
-  const [settings, setSettings] = useState<Settings | null>(null);
+  const { settings, loading, error, loadSettings, updateSettings } = useSettingsStore();
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    getSettings().then(setSettings).catch(console.error);
+    loadSettings().catch(console.error);
   }, []);
 
   const handleSave = async () => {
+    if (!settings) return;
     try {
-      await saveSettings(settings);
+      await updateSettings(settings);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
@@ -23,8 +25,19 @@ export default function Settings() {
     }
   };
 
-  if (!settings) {
+  if (loading) {
     return <div className="flex items-center justify-center h-full text-[var(--text-muted)]">Загрузка...</div>;
+  }
+
+  if (error || !settings) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-[var(--text-muted)] gap-2">
+        <span className="text-red-400">Ошибка загрузки настроек</span>
+        <button onClick={() => loadSettings()} className="px-4 py-2 rounded-lg bg-purple-500 text-white text-sm">
+          Повторить
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -42,25 +55,25 @@ export default function Settings() {
             label="Автоподключение"
             desc="Подключаться к последнему серверу при запуске"
             value={settings.auto_connect}
-            onChange={(v) => setSettings({ ...settings, auto_connect: v })}
+            onChange={(v) => updateSettings({ auto_connect: v }).catch(console.error)}
           />
           <SettingsToggle
             label="Подключение при старте системы"
             desc="Запускать VPN вместе с Windows"
             value={settings.connect_on_startup}
-            onChange={(v) => setSettings({ ...settings, connect_on_startup: v })}
+            onChange={(v) => updateSettings({ connect_on_startup: v }).catch(console.error)}
           />
           <SettingsToggle
             label="Kill Switch"
             desc="Блокировать весь трафик при разрыве VPN"
             value={settings.kill_switch}
-            onChange={(v) => setSettings({ ...settings, kill_switch: v })}
+            onChange={(v) => updateSettings({ kill_switch: v }).catch(console.error)}
           />
           <SettingsToggle
             label="Разрешить LAN"
             desc="Доступ к локальной сети при подключении"
             value={settings.allow_lan}
-            onChange={(v) => setSettings({ ...settings, allow_lan: v })}
+            onChange={(v) => updateSettings({ allow_lan: v }).catch(console.error)}
           />
         </SettingsGroup>
 
@@ -69,17 +82,17 @@ export default function Settings() {
           <SettingsInput
             label="SOCKS5 порт"
             value={String(settings.socks_port)}
-            onChange={(v) => setSettings({ ...settings, socks_port: parseInt(v) || 1080 })}
+            onChange={(v) => updateSettings({ socks_port: parseInt(v) || 1080 }).catch(console.error)}
           />
           <SettingsInput
             label="HTTP порт"
             value={String(settings.http_port)}
-            onChange={(v) => setSettings({ ...settings, http_port: parseInt(v) || 8080 })}
+            onChange={(v) => updateSettings({ http_port: parseInt(v) || 8080 }).catch(console.error)}
           />
           <SettingsInput
             label="DNS серверы"
             value={settings.dns_servers}
-            onChange={(v) => setSettings({ ...settings, dns_servers: v })}
+            onChange={(v) => updateSettings({ dns_servers: v }).catch(console.error)}
           />
         </SettingsGroup>
 
@@ -88,12 +101,12 @@ export default function Settings() {
           <SettingsInput
             label="Таймаут подключения (сек)"
             value={String(settings.connection_timeout)}
-            onChange={(v) => setSettings({ ...settings, connection_timeout: parseInt(v) || 30 })}
+            onChange={(v) => updateSettings({ connection_timeout: parseInt(v) || 30 }).catch(console.error)}
           />
           <SettingsInput
             label="Попыток переподключения"
             value={String(settings.reconnect_attempts)}
-            onChange={(v) => setSettings({ ...settings, reconnect_attempts: parseInt(v) || 3 })}
+            onChange={(v) => updateSettings({ reconnect_attempts: parseInt(v) || 3 }).catch(console.error)}
           />
         </SettingsGroup>
 
@@ -103,7 +116,7 @@ export default function Settings() {
             <span className="text-sm">Язык</span>
             <select
               value={settings.language}
-              onChange={(e) => setSettings({ ...settings, language: e.target.value })}
+              onChange={(e) => updateSettings({ language: e.target.value }).catch(console.error)}
               className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md px-3 py-1.5 text-sm text-[var(--text-primary)] focus:outline-none"
             >
               <option value="ru">Русский</option>

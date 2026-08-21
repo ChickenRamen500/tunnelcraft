@@ -89,9 +89,9 @@ tunnelcraft/
 ├── ui/                     # Tauri приложение
 │   ├── src/                # React frontend
 │   │   ├── components/     # UI компоненты
-│   │   ├── hooks/          # React хуки (useGrpc.ts)
-│   │   ├── pages/          # Страницы приложения
-│   │   └── stores/         # Zustand stores
+│   │   ├── hooks/          # React хуки (useApi.ts - HTTP клиент)
+│   │   ├── pages/          # Страницы приложения (Dashboard, Servers, Subscriptions, Logs, Settings)
+│   │   └── stores/         # Zustand stores (connection, settings)
 │   └── src-tauri/          # Rust backend
 │       ├── src/
 │       │   ├── main.rs     # Точка входа Tauri

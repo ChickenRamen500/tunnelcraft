@@ -1,4 +1,4 @@
-import type { Server } from "@/hooks/useGrpc";
+import type { Server } from "@/hooks/useApi";
 import { Wifi, Globe, Shield, Zap } from "lucide-react";
 
 interface ServerCardProps {

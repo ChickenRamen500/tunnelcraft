@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus, Trash2, Shield, Globe, Ban, ArrowRight } from "lucide-react";
-import { getRoutingRules, type RoutingRule } from "@/hooks/useGrpc";
+import { getRoutingRules, type RoutingRule } from "@/hooks/useApi";
 
 export default function SplitTunnel() {
   const [rules, setRules] = useState<RoutingRule[]>([]);
