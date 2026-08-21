@@ -105,7 +105,16 @@ func (h *HTTPServer) Wait() {
 
 func httpCORSMiddleware(next http.Handler) http.Handler {
         return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-                w.Header().Set("Access-Control-Allow-Origin", "http://localhost:*")
+                // Allow requests from localhost in development
+                origin := req.Header.Get("Origin")
+                if origin == "" || 
+                   strings.HasPrefix(origin, "http://localhost") || 
+                   strings.HasPrefix(origin, "http://127.0.0.1") ||
+                   origin == "tauri://localhost" {
+                        w.Header().Set("Access-Control-Allow-Origin", origin)
+                } else {
+                        w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+                }
                 w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
                 w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
                 w.Header().Set("Access-Control-Max-Age", "86400")
