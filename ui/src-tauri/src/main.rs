@@ -10,42 +10,50 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{Manager};
 
 // Global state to manage daemon process
+#[allow(dead_code)]
 struct DaemonState {
     process: Option<Child>,
 }
 
+#[allow(dead_code)]
 impl DaemonState {
     fn new() -> Self {
         DaemonState { process: None }
     }
 }
 
-/// Spawn tunnelcraftd.exe from ../bin/ relative to the Tauri app.
+/// Spawn tunnelcraftd.exe. Searches multiple candidate paths.
 fn spawn_daemon() -> std::io::Result<Child> {
-    let exe_dir = std::env::current_exe()?
-        .parent()
-        .map(|p| p.to_path_buf())
-        .unwrap_or_default();
+    let exe_path = std::env::current_exe()?;
+    let exe_dir = exe_path.parent().unwrap_or_default();
 
-    // In dev mode, the exe is in target/debug/, daemon is at ../../bin/
-    // In production, both are in the same directory
-    let daemon_path = exe_dir
-        .join("..")
-        .join("..")
-        .join("bin")
-        .join("tunnelcraftd.exe");
+    // In dev mode the exe is at:  <repo>/ui/src-tauri/target/debug/tunnelcraft-ui.exe
+    // The daemon is at:           <repo>/bin/tunnelcraftd.exe
+    // So we need: exe_dir / ".." / ".." / ".." / ".." / "bin" / "tunnelcraftd.exe"
+    //
+    // In production (installed), both are in the same directory.
+    let candidates: Vec<std::path::PathBuf> = vec![
+        // Dev mode: 4 levels up from target/debug/
+        exe_dir.join("..").join("..").join("..").join("..").join("bin").join("tunnelcraftd.exe"),
+        // Alternative dev: 3 levels up (if running from src-tauri/)
+        exe_dir.join("..").join("..").join("..").join("bin").join("tunnelcraftd.exe"),
+        // Same directory as Tauri exe (production / sidecar)
+        exe_dir.join("tunnelcraftd.exe"),
+    ];
 
-    // Fallback: same directory as the Tauri exe (production)
-    let daemon_path = if daemon_path.exists() {
-        daemon_path
-    } else {
-        exe_dir.join("tunnelcraftd.exe")
-    };
+    for path in &candidates {
+        println!("[tauri] checking daemon at: {:?}", path);
+        if path.exists() {
+            println!("[tauri] found daemon at: {:?}", path);
+            return Command::new(path).spawn();
+        }
+    }
 
-    println!("[tauri] attempting to spawn daemon at: {:?}", daemon_path);
-
-    Command::new(&daemon_path)
-        .spawn()
+    let last = candidates.last().unwrap();
+    Err(std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        format!("tunnelcraftd.exe not found. Searched: {:?}", candidates),
+    ))
 }
 
 /// Check if daemon HTTP API is reachable
