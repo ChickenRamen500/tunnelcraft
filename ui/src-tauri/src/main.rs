@@ -6,19 +6,28 @@ mod grpc_client;
 
 use std::process::{Child, Command};
 use std::sync::Mutex;
+use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{Manager};
+use tauri::{Manager, RunEvent};
 
 // Global state to manage daemon process
-#[allow(dead_code)]
 struct DaemonState {
     process: Option<Child>,
 }
 
-#[allow(dead_code)]
 impl DaemonState {
     fn new() -> Self {
         DaemonState { process: None }
+    }
+
+    fn kill_daemon(&mut self) {
+        if let Some(mut child) = self.process.take() {
+            println!("[tauri] killing daemon process (PID: {:?})", child.id());
+            let _ = child.kill();
+            let _ = child.wait();
+        } else {
+            println!("[tauri] no daemon process to kill");
+        }
     }
 }
 
@@ -34,9 +43,20 @@ fn spawn_daemon() -> std::io::Result<Child> {
     // In production (installed), both are in the same directory.
     let candidates: Vec<std::path::PathBuf> = vec![
         // Dev mode: 4 levels up from target/debug/
-        exe_dir.join("..").join("..").join("..").join("..").join("bin").join("tunnelcraftd.exe"),
+        exe_dir
+            .join("..")
+            .join("..")
+            .join("..")
+            .join("..")
+            .join("bin")
+            .join("tunnelcraftd.exe"),
         // Alternative dev: 3 levels up (if running from src-tauri/)
-        exe_dir.join("..").join("..").join("..").join("bin").join("tunnelcraftd.exe"),
+        exe_dir
+            .join("..")
+            .join("..")
+            .join("..")
+            .join("bin")
+            .join("tunnelcraftd.exe"),
         // Same directory as Tauri exe (production / sidecar)
         exe_dir.join("tunnelcraftd.exe"),
     ];
@@ -49,7 +69,6 @@ fn spawn_daemon() -> std::io::Result<Child> {
         }
     }
 
-    let last = candidates.last().unwrap();
     Err(std::io::Error::new(
         std::io::ErrorKind::NotFound,
         format!("tunnelcraftd.exe not found. Searched: {:?}", candidates),
@@ -77,6 +96,11 @@ fn get_daemon_status() -> serde_json::Value {
     })
 }
 
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Try to spawn the daemon
@@ -101,12 +125,44 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .manage(Mutex::new(DaemonState { process: daemon_started }))
-        .invoke_handler(tauri::generate_handler![get_daemon_status])
+        .manage(Mutex::new(DaemonState {
+            process: daemon_started,
+        }))
+        .invoke_handler(tauri::generate_handler![get_daemon_status, quit_app])
         .setup(|app| {
+            // Build tray menu
+            let show_hide = MenuItemBuilder::with_id("show_hide", "Показать / Скрыть").build(app)?;
+            let quit = MenuItemBuilder::with_id("quit", "Выход").build(app)?;
+            let menu = MenuBuilder::new(app)
+                .item(&show_hide)
+                .separator()
+                .item(&quit)
+                .build()?;
+
             let tray = TrayIconBuilder::new()
+                .id("main-tray")
                 .icon(app.default_window_icon().unwrap().clone())
                 .tooltip("TunnelCraft - Запуск...")
+                .menu(&menu)
+                .on_menu_event(|app, event| {
+                    match event.id.as_ref() {
+                        "show_hide" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                if window.is_visible().unwrap_or(false) {
+                                    let _ = window.hide();
+                                } else {
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
+                                }
+                            }
+                        }
+                        "quit" => {
+                            println!("[tauri] quit requested from tray menu");
+                            app.exit(0);
+                        }
+                        _ => {}
+                    }
+                })
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click {
                         button: MouseButton::Left,
@@ -126,29 +182,45 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            app.manage(tray);
-            
             // Update tray tooltip based on daemon status
-            let app_handle = app.handle().clone();
+            let tray_handle = tray.handle().clone();
             std::thread::spawn(move || {
                 std::thread::sleep(std::time::Duration::from_secs(2));
-                let status = if std::net::TcpStream::connect("127.0.0.1:50052").is_ok() {
-                    "TunnelCraft - Работает"
-                } else {
-                    "TunnelCraft - Ошибка демона"
-                };
-                if let Some(tray) = app_handle.tray_by_id("main-tray") {
-                    let _ = tray.set_tooltip(Some(status));
+                let status =
+                    if std::net::TcpStream::connect("127.0.0.1:50052").is_ok() {
+                        "TunnelCraft - Работает"
+                    } else {
+                        "TunnelCraft - Ошибка демона"
+                    };
+                let _ = tray_handle.set_tooltip(Some(status));
+            });
+
+            // Hide to tray on window close instead of quitting
+            let window = app.get_webview_window("main").unwrap();
+            let win_handle = window.clone();
+            window.on_window_event(move |event| {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    // Prevent the window from closing — hide it instead
+                    api.prevent_close();
+                    let _ = win_handle.hide();
                 }
             });
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running TunnelCraft");
-
-    // Kill daemon on exit
-    println!("[tauri] shutting down, cleaning up daemon process...");
+        .build(tauri::generate_context!())
+        .expect("error while building TunnelCraft")
+        .run(|app_handle, event| {
+            if let RunEvent::Exit = event {
+                println!("[tauri] app exiting, cleaning up daemon...");
+                // Kill daemon on app exit
+                if let Some(state) = app_handle.try_state::<Mutex<DaemonState>>() {
+                    if let Ok(mut daemon) = state.lock() {
+                        daemon.kill_daemon();
+                    }
+                }
+            }
+        });
 }
 
 fn main() {

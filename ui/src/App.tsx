@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { LayoutDashboard, Server, Rss, GitBranch, Settings, Activity, FileText } from "lucide-react";
+import { LayoutDashboard, Server, Rss, GitBranch, Settings, Activity, FileText, LogOut } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import { useConnectionStore } from "@/stores/connection";
 import { getConnectionStatus } from "@/hooks/useApi";
 import Dashboard from "@/pages/Dashboard";
@@ -67,6 +68,15 @@ export default function App() {
 
           {/* Spacer */}
           <div className="flex-1" />
+
+          {/* Exit button */}
+          <button
+            onClick={() => { invoke('quit_app'); }}
+            className="flex items-center gap-2.5 px-4 py-2.5 mx-2 rounded-lg text-sm transition-all duration-150 text-red-400 hover:bg-red-500/10 hover:text-red-300 border-l-2 border-transparent"
+          >
+            <LogOut size={16} />
+            <span>Выход</span>
+          </button>
 
           {/* Version */}
           <div className="px-4 py-2 text-xs text-[var(--text-muted)]">v0.1.0</div>
