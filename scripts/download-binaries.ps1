@@ -190,7 +190,8 @@ Write-Host ""
 
 # ------------------------------------------------------------------
 # 5. amnezia-wg.exe — AmneziaWG binary (AWG2 + AWG3 support)
-#    Clone and build from amnezia-vpn/amneziawg-windows repository
+#    Clone and build from amnezia-vpn/amnezia-wg repository
+#    main.go is at the ROOT of the repo, NOT in cmd/
 # ------------------------------------------------------------------
 Write-Host "[5/5] amnezia-wg.exe" -ForegroundColor Yellow
 $awgExe = Join-Path $BinDir "amnezia-wg.exe"
@@ -225,35 +226,71 @@ if (-not $awgFound) {
 if (-not $awgFound) {
     $goCmd = Get-Command go -ErrorAction SilentlyContinue
     if ($goCmd) {
-        Write-Host "  Cloning and building amnezia-wg from source..." -ForegroundColor DarkGray
+        $goVersion = & go version 2>&1
+        Write-Host "  Go found: $goVersion" -ForegroundColor DarkGray
+        Write-Host "  Cloning amnezia-wg from source..." -ForegroundColor DarkGray
+
+        $tempDir = Join-Path $env:TEMP "tunnelcraft-amnezia-build"
+        $buildOk = $false
+
         try {
-            $tempDir = Join-Path $env:TEMP "tunnelcraft-amnezia-build"
             if (Test-Path $tempDir) { Remove-Item -Recurse -Force $tempDir }
-            New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
-            
-            & git clone --depth 1 https://github.com/amnezia-vpn/amneziawg-windows $tempDir 2>&1 | Out-Null
-            
-            if (Test-Path (Join-Path $tempDir "cmd\amnezia-wg")) {
-                cd $tempDir\cmd\amnezia-wg
-                $env:GOOS = "windows"
-                $env:GOARCH = "amd64"
-                & go build -o $awgExe . 2>&1 | Out-Null
-                
-                if (Test-Path $awgExe) {
-                    $sz = [math]::Round((Get-Item $awgExe).Length / 1MB, 2)
-                    Write-Host "  [OK] amnezia-wg.exe built from source ($sz MB)" -ForegroundColor Green
-                    $awgFound = $true
-                } else {
-                    Write-Host "  [WARN] amnezia-wg build produced no binary" -ForegroundColor DarkYellow
-                }
-                cd $PSScriptRoot
+
+            Write-Host "  git clone https://github.com/amnezia-vpn/amnezia-wg ..." -ForegroundColor DarkGray
+            $cloneOutput = & git clone --depth 1 https://github.com/amnezia-vpn/amnezia-wg $tempDir 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "  [FAIL] git clone failed:" -ForegroundColor Red
+                Write-Host "  $cloneOutput" -ForegroundColor Red
             } else {
-                Write-Host "  [WARN] amnezia-wg source structure unexpected" -ForegroundColor DarkYellow
+                Write-Host "  Clone OK, building..." -ForegroundColor DarkGray
+
+                # Save current directory
+                $pushd = Get-Location
+                Set-Location $tempDir
+
+                try {
+                    # Verify main.go exists at root
+                    if (-not (Test-Path (Join-Path $tempDir "main.go"))) {
+                        Write-Host "  [FAIL] main.go not found in repo root" -ForegroundColor Red
+                    } else {
+                        $env:GOOS = "windows"
+                        $env:GOARCH = "amd64"
+                        $env:CGO_ENABLED = "0"
+
+                        Write-Host "  Running: go build -v -o $awgExe ." -ForegroundColor DarkGray
+                        $buildOutput = & go build -v -o $awgExe . 2>&1
+
+                        if ($LASTEXITCODE -eq 0 -and (Test-Path $awgExe)) {
+                            $sz = [math]::Round((Get-Item $awgExe).Length / 1MB, 2)
+                            Write-Host "  [OK] amnezia-wg.exe built from source ($sz MB)" -ForegroundColor Green
+                            $awgFound = $true
+                            $buildOk = $true
+                        } else {
+                            Write-Host "  [FAIL] go build failed with exit code $LASTEXITCODE" -ForegroundColor Red
+                            if ($buildOutput) {
+                                $buildOutput | ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
+                            }
+                        }
+                    }
+                } finally {
+                    # Restore directory
+                    Set-Location $pushd
+                    # Clean env
+                    Remove-Item Env:\GOOS -ErrorAction SilentlyContinue
+                    Remove-Item Env:\GOARCH -ErrorAction SilentlyContinue
+                    Remove-Item Env:\CGO_ENABLED -ErrorAction SilentlyContinue
+                }
             }
-            
-            Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
         } catch {
-            Write-Host "  [WARN] amnezia-wg clone/build failed: $($_.Exception.Message)" -ForegroundColor DarkYellow
+            Write-Host "  [FAIL] Unexpected error: $($_.Exception.Message)" -ForegroundColor Red
+        }
+
+        # Cleanup temp dir
+        if (-not $buildOk) {
+            if (Test-Path $tempDir) { Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue }
+        } else {
+            # Keep the cloned repo for future rebuilds
+            Write-Host "  Source kept at: $tempDir" -ForegroundColor DarkGray
         }
     } else {
         Write-Host "  [SKIP] Go not installed, cannot build amnezia-wg" -ForegroundColor DarkYellow
@@ -264,7 +301,7 @@ if (-not $awgFound) {
     Write-Host "  [SKIP] amnezia-wg.exe not found." -ForegroundColor DarkYellow
     Write-Host "         Options:" -ForegroundColor DarkYellow
     Write-Host "         1. Copy from AmneziaVPN install to bin\amnezia-wg.exe" -ForegroundColor DarkYellow
-    Write-Host "         2. Install Go and re-run this script (will auto-build)" -ForegroundColor DarkYellow
+    Write-Host "         2. Install Go 1.22+ and re-run this script (will auto-build)" -ForegroundColor DarkYellow
     Write-Host "         3. Manually place amnezia-wg.exe in the bin/ folder" -ForegroundColor DarkYellow
 }
 Write-Host ""

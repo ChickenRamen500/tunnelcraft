@@ -17,10 +17,11 @@ import (
         "google.golang.org/grpc/reflection"
         "google.golang.org/grpc/status"
 
+        "google.golang.org/protobuf/types/known/emptypb"
+
         "github.com/ChickenRamen500/tunnelcraft/core/internal/config"
         "github.com/ChickenRamen500/tunnelcraft/core/internal/engine"
         protos "github.com/ChickenRamen500/tunnelcraft/core/internal/proto"
-                "google.golang.org/protobuf/types/known/emptypb"
 
         "github.com/ChickenRamen500/tunnelcraft/core/internal/subscription"
 )

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LayoutDashboard, Server, Rss, GitBranch, Settings, Activity, FileText } from "lucide-react";
 import { useConnectionStore } from "@/stores/connection";
 import { getConnectionStatus } from "@/hooks/useApi";
@@ -26,9 +26,9 @@ export default function App() {
   const { status, fallbackMode, setStatus } = useConnectionStore();
 
   // Initial status fetch
-  useState(() => {
+  useEffect(() => {
     getConnectionStatus().then(setStatus).catch(console.error);
-  });
+  }, [setStatus]);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-[var(--bg-primary)] select-none">
