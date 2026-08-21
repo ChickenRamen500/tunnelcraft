@@ -34,7 +34,7 @@ impl DaemonState {
 /// Spawn tunnelcraftd.exe. Searches multiple candidate paths.
 fn spawn_daemon() -> std::io::Result<Child> {
     let exe_path = std::env::current_exe()?;
-    let exe_dir = exe_path.parent().unwrap_or_default();
+    let exe_dir = exe_path.parent().unwrap_or(std::path::Path::new(""));
 
     // In dev mode the exe is at:  <repo>/ui/src-tauri/target/debug/tunnelcraft-ui.exe
     // The daemon is at:           <repo>/bin/tunnelcraftd.exe
@@ -140,7 +140,6 @@ pub fn run() {
                 .build()?;
 
             let tray = TrayIconBuilder::new()
-                .id("main-tray")
                 .icon(app.default_window_icon().unwrap().clone())
                 .tooltip("TunnelCraft - Запуск...")
                 .menu(&menu)
