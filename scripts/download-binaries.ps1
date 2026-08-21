@@ -190,8 +190,7 @@ Write-Host ""
 
 # ------------------------------------------------------------------
 # 5. amnezia-wg.exe — AmneziaWG binary (AWG2 + AWG3 support)
-#    The repo amnezia-vpn/amneziawg-windows has NO releases.
-#    Options: copy from AmneziaVPN install, build from source, or manual.
+#    Clone and build from amnezia-vpn/amneziawg-windows repository
 # ------------------------------------------------------------------
 Write-Host "[5/5] amnezia-wg.exe" -ForegroundColor Yellow
 $awgExe = Join-Path $BinDir "amnezia-wg.exe"
@@ -222,30 +221,42 @@ if (-not $awgFound) {
     }
 }
 
-# Try building from source if Go is available
+# Build from source by cloning the repository
 if (-not $awgFound) {
     $goCmd = Get-Command go -ErrorAction SilentlyContinue
     if ($goCmd) {
-        Write-Host "  Attempting to build amnezia-wg from source..." -ForegroundColor DarkGray
+        Write-Host "  Cloning and building amnezia-wg from source..." -ForegroundColor DarkGray
         try {
-            $env:GOOS = "windows"
-            $env:GOARCH = "amd64"
-            & go install github.com/amnezia-vpn/amnezia-wg/cmd/amnezia-wg@latest 2>&1 | Out-Null
-            $goPath = (& go env GOPATH 2>$null)
-            if ($goPath) {
-                $builtExe = Join-Path $goPath "bin\amnezia-wg.exe"
-                if (Test-Path $builtExe) {
-                    Copy-Item $builtExe $awgExe -Force
+            $tempDir = Join-Path $env:TEMP "tunnelcraft-amnezia-build"
+            if (Test-Path $tempDir) { Remove-Item -Recurse -Force $tempDir }
+            New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+            
+            & git clone --depth 1 https://github.com/amnezia-vpn/amneziawg-windows $tempDir 2>&1 | Out-Null
+            
+            if (Test-Path (Join-Path $tempDir "cmd\amnezia-wg")) {
+                cd $tempDir\cmd\amnezia-wg
+                $env:GOOS = "windows"
+                $env:GOARCH = "amd64"
+                & go build -o $awgExe . 2>&1 | Out-Null
+                
+                if (Test-Path $awgExe) {
                     $sz = [math]::Round((Get-Item $awgExe).Length / 1MB, 2)
                     Write-Host "  [OK] amnezia-wg.exe built from source ($sz MB)" -ForegroundColor Green
                     $awgFound = $true
                 } else {
                     Write-Host "  [WARN] amnezia-wg build produced no binary" -ForegroundColor DarkYellow
                 }
+                cd $PSScriptRoot
+            } else {
+                Write-Host "  [WARN] amnezia-wg source structure unexpected" -ForegroundColor DarkYellow
             }
+            
+            Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
         } catch {
-            Write-Host "  [WARN] amnezia-wg build failed: $($_.Exception.Message)" -ForegroundColor DarkYellow
+            Write-Host "  [WARN] amnezia-wg clone/build failed: $($_.Exception.Message)" -ForegroundColor DarkYellow
         }
+    } else {
+        Write-Host "  [SKIP] Go not installed, cannot build amnezia-wg" -ForegroundColor DarkYellow
     }
 }
 
@@ -253,7 +264,7 @@ if (-not $awgFound) {
     Write-Host "  [SKIP] amnezia-wg.exe not found." -ForegroundColor DarkYellow
     Write-Host "         Options:" -ForegroundColor DarkYellow
     Write-Host "         1. Copy from AmneziaVPN install to bin\amnezia-wg.exe" -ForegroundColor DarkYellow
-    Write-Host "         2. go install github.com/amnezia-vpn/amnezia-wg/cmd/amnezia-wg@latest" -ForegroundColor DarkYellow
+    Write-Host "         2. Install Go and re-run this script (will auto-build)" -ForegroundColor DarkYellow
     Write-Host "         3. Manually place amnezia-wg.exe in the bin/ folder" -ForegroundColor DarkYellow
 }
 Write-Host ""
@@ -262,7 +273,7 @@ Write-Host ""
 # Summary
 # ------------------------------------------------------------------
 Write-Host "=== Summary ===" -ForegroundColor Cyan
-$required = @("xray-core.exe", "hysteria.exe", "wintun.dll", "wireguard.exe")
+$required = @("xray-core.exe", "hysteria.exe", "wintun.dll", "wireguard.exe", "amnezia-wg.exe")
 $ok = 0
 $fail = 0
 foreach ($f in $required) {
@@ -281,4 +292,7 @@ if ($fail -eq 0) {
     Write-Host "All binaries ready! You can start tunnelcraftd now." -ForegroundColor Green
 } else {
     Write-Host "$ok ok, $fail missing. Core features (xray, hysteria) should work." -ForegroundColor Yellow
+    if ($fail -le 2) {
+        Write-Host "Note: WireGuard/AmneziaWG features may not work until binaries are installed." -ForegroundColor DarkYellow
+    }
 }

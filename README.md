@@ -10,26 +10,60 @@ TunnelCraft — это VPN-клиент с современным интерфе
 
 ## Быстрый старт
 
-### 1. Сборка Go демона
+### 1. Установка зависимостей
+
+Перед началом убедитесь, что у вас установлены:
+
+- **Go 1.19+** (для сборки демона и wireguard/amnezia-wg)
+- **Node.js 18+** (для frontend)
+- **Rust 1.70+** (для сборки Tauri)
+- **Git** (для клонирования репозиториев)
+- **Windows 10/11** (для работы с WireGuard и TUN адаптерами)
+
+### 2. Скачивание бинарных зависимостей
+
+Скрипт автоматически скачает и скомпилирует все необходимые binaries:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\download-binaries.ps1
+```
+
+Что входит в скрипт:
+- **xray-core.exe** — скачивается с GitHub releases Xray-core
+- **hysteria.exe** — скачивается с GitHub releases Hysteria
+- **wintun.dll** — скачивается с wintun.net
+- **wireguard.exe** — копируется из установленной WireGuard или строится из исходников
+- **wireguard-go.exe** — строится из исходников через `go install`
+- **amnezia-wg.exe** — **клонируется репозиторий amnezia-vpn/amneziawg-windows и компилируется**
+
+> **Примечание:** Для компиляции amnezia-wg.exe требуется установленный Go. Скрипт автоматически:
+> 1. Клонирует репозиторий https://github.com/amnezia-vpn/amneziawg-windows во временную папку
+> 2. Компилирует `amnezia-wg.exe` для Windows amd64
+> 3. Копирует результат в `bin/amnezia-wg.exe`
+> 4. Очищает временные файлы
+
+Если Go не установлен, вы можете:
+- Установить Go и перезапустить скрипт
+- Или скопировать `amnezia-wg.exe` из установки AmneziaVPN в папку `bin/`
+
+### 3. Сборка Go демона
 
 ```bash
 ./build_daemon.sh
 ```
 
-Это создаст бинарный файл `bin/tunnelcraftd.exe`.
-
-### 2. Запуск в режиме разработки
-
-#### Терминал 1: Запуск Go демона (опционально)
-
-Демон запускается автоматически при старте Tauri приложения, но вы можете запустить его вручную для отладки:
+Или вручную:
 
 ```bash
 cd core/cmd/tunnelcraftd
-go run . --data ./data --config ./data/config.yaml
+go build -o ../../bin/tunnelcraftd.exe .
 ```
 
-#### Терминал 2: Запуск Tauri приложения
+Это создаст бинарный файл `bin/tunnelcraftd.exe`.
+
+### 4. Запуск в режиме разработки
+
+#### Терминал 1: Запуск Tauri приложения
 
 ```bash
 cd ui
@@ -38,9 +72,19 @@ npm run tauri dev
 ```
 
 Приложение автоматически:
-1. Запустит tunnelcraftd.exe как sidecar процесс
+1. Запустит `tunnelcraftd.exe` как sidecar процесс
 2. Дождётся готовности HTTP API на порту 50052
 3. Откроет окно приложения
+
+> **Примечание:** Демон запускается автоматически при старте Tauri приложения. Ручной запуск нужен только для отладки.
+
+#### Опционально: Ручной запуск демона для отладки
+
+```bash
+cd core/cmd/tunnelcraftd
+go run . --data ./data --config ./data/config.yaml
+```
+
 
 ## API Демона
 
@@ -131,10 +175,12 @@ npm run tauri build
 
 ## Требования
 
-- Go 1.21+
-- Node.js 18+
-- Rust 1.70+ (для сборки Tauri)
-- Windows 10/11 (для работы с WireGuard и TUN адаптерами)
+- **Go 1.19+** (для сборки демона и wireguard/amnezia-wg)
+- **Node.js 18+** (для frontend)
+- **Rust 1.70+** (для сборки Tauri)
+- **Git** (для клонирования репозиториев)
+- **Windows 10/11** (для работы с WireGuard и TUN адаптерами)
+- **7-Zip** (опционально, для извлечения wireguard-go.exe из установщика WireGuard)
 
 ## Лицензия
 
