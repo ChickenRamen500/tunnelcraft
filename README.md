@@ -1,196 +1,141 @@
 # TunnelCraft
 
-**TunnelCraft** — VPN-клиент для Windows 10/11, оборачивающий open-source реализации протоколов в единый GUI.
-
-## Поддерживаемые протоколы
-
-| Протокол | Бинарник | Описание |
-|----------|----------|----------|
-| VLESS | xray-core.exe | VLESS, VLESS+KCP, VLESS+XHTTP+REALITY |
-| VMESS | xray-core.exe | VMess с поддержкой транспорта |
-| WireGuard | wireguard.exe | Классический WireGuard (через Windows Service) |
-| AmneziaWG | amnezia-wg.exe | **AWG2 + AWG3** (HeaderProtectionKey, timing, content padding) |
-| Hysteria2 | hysteria.exe | Hysteria2 QUIC-протокол |
-
-### AWG3 — что нового
-
-AmneziaWG 3.0 добавляет:
-- **HeaderProtectionKey** — ChaCha20-шифрование заголовков пакетов (DPI не видит тип сообщения)
-- **ContentPaddingAddition** — кастомный паддинг содержимого
-- **Тайминги** — RekeyAfterTime, RekeyTimeout, RejectAfterTime, KeepaliveTimeout, MaxHandshakeAttempts
-
-Все AWG3 поля поддерживаются по всей цепочке: парсинг подписок → конфиг → gRPC → генерация .conf → amnezia-wg.exe.
+TunnelCraft — это VPN-клиент с современным интерфейсом, построенный на Tauri v2 (React + Rust) и Go демоне.
 
 ## Архитектура
 
-```
-┌─────────────────────┐
-│   Tauri 2.0 UI      │  React + TypeScript + Vite
-│   (ui/src/)         │  Тёмная тема, системный трей
-└──────────┬──────────┘
-           │ gRPC (127.0.0.1:50051)
-┌──────────▼──────────┐
-│  tunnelcraftd        │  Go 1.22+ демон
-│  (core/)            │  Управление протоколами,
-│                     │  TUN-интерфейс, маршрутизация,
-│                     │  подписки, fallback
-└──────────┬──────────┘
-           │ subprocess
-┌──────────▼──────────┐
-│  Protocol Binaries  │  xray-core, wireguard,
-│  (bin/)             │  amnezia-wg, hysteria
-└─────────────────────┘
+- **Frontend**: React + TypeScript (ui/)
+- **Backend**: Tauri v2 Rust приложение (ui/src-tauri/)
+- **Daemon**: Go демон tunnelcraftd (core/)
+
+## Быстрый старт
+
+### 1. Сборка Go демона
+
+```bash
+./build_daemon.sh
 ```
 
-## Ключевые возможности
+Это создаст бинарный файл `bin/tunnelcraftd.exe`.
 
-- **Единый интерфейс** для всех протоколов VPN
-- **AWG2 + AWG3** — полная поддержка AmneziaWG 3.0 (HeaderProtectionKey и тайминги)
-- **Автоматический fallback** — при недоступности серверов подписки переключается на локальный WireGuard/AmneziaWG
-- **Split tunneling** — маршрутизация по доменам, IP-адресам, приложениям
-- **Авто-обновление подписок** — фоновое обновление серверов
-- **Системный трей** — индикатор статуса в трее (зелёный/красный/жёлтый)
-- **Kill switch** — блокировка трафика при разрыве VPN
-- **DNS-over-HTTPS** — безопасное разрешение DNS
+### 2. Запуск в режиме разработки
 
----
+#### Терминал 1: Запуск Go демона (опционально)
 
-## 🚀 Установка и запуск (пошагово)
+Демон запускается автоматически при старте Tauri приложения, но вы можете запустить его вручную для отладки:
 
-### Шаг 1. Установить prerequisites
-
-#### 1a. Go 1.22+
-Скачай с https://go.dev/dl/ и установи. Проверь:
-```
-go version
+```bash
+cd core/cmd/tunnelcraftd
+go run . --data ./data --config ./data/config.yaml
 ```
 
-#### 1b. Node.js 18+
-Скачай с https://nodejs.org/ (LTS версию). Проверь:
-```
-node -v
-npm -v
-```
+#### Терминал 2: Запуск Tauri приложения
 
-#### 1c. Rust (через rustup)
-Скачай с https://rustup.rs/ и установи. Проверь:
-```
-rustc --version
-cargo --version
-```
-
-#### 1d. **Visual Studio Build Tools** (ОБЯЗАТЕЛЬНО для Tauri!)
-
-Без этого Rust не сможет скомпилировать Tauri — будет ошибка `linker link.exe not found`.
-
-1. Скачай **Visual Studio Build Tools 2022**: https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022
-2. Запусти установщик
-3. Выбери **"Desktop development with C++"** (Настольная разработка на C++)
-4. Нажми "Установить" (размер ~6-8 ГБ)
-
-После установки перезагрузи терминал (закрой и открой PowerShell заново).
-
-#### 1e. Tauri CLI 2.0
-```
-cargo install tauri-cli --version "^2"
-```
-
-### Шаг 2. Клонировать репозиторий
-
-```powershell
-git clone https://github.com/ChickenRamen500/tunnelcraft.git
-cd tunnelcraft
-```
-
-### Шаг 3. Скачать бинарники протоколов
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\download-binaries.ps1
-```
-
-Это скачает: xray-core.exe, hysteria.exe, wintun.dll, wireguard.exe.
-
-**amnezia-wg.exe** скачивается отдельно (см. ниже).
-
-### Шаг 4. Получить amnezia-wg.exe
-
-Репозиторий `amnezia-vpn/amneziawg-windows` **не имеет релизов**. Варианты:
-
-**Вариант А: Из приложения AmneziaVPN**
-1. Установи AmneziaVPN с https://amnezia.org/downloads
-2. Найди `amnezia-wg.exe` в директории установки (обычно `C:\Program Files\AmneziaVPN\`)
-3. Скопируй в `bin\amnezia-wg.exe`
-
-**Вариант Б: Собрать из исходников**
-```
-set GOOS=windows
-set GOARCH=amd64
-go install github.com/amnezia-vpn/amnezia-wg/cmd/amnezia-wg@latest
-```
-Затем скопируй `%GOPATH%\bin\amnezia-wg.exe` в `bin\`.
-
-**Вариант В: У тебя уже есть файл**
-Просто положи `amnezia-wg.exe` в папку `bin\` проекта.
-
-### Шаг 5. Собрать Go-демон
-
-```powershell
-cd core
-go build -o ..\bin\tunnelcraftd.exe .\cmd\tunnelcraftd\main.go
-cd ..
-```
-
-### Шаг 6. Запустить в dev-режиме
-
-```powershell
+```bash
 cd ui
 npm install
-npx tauri dev
+npm run tauri dev
 ```
 
-Откроется окно TunnelCraft.
+Приложение автоматически:
+1. Запустит tunnelcraftd.exe как sidecar процесс
+2. Дождётся готовности HTTP API на порту 50052
+3. Откроет окно приложения
 
----
+## API Демона
 
-## Альтернативный запуск (только бэкенд)
+Go демон предоставляет HTTP REST API на `http://127.0.0.1:50052`:
 
-Если хочешь протестировать только Go-демон без UI:
+| Endpoint | Метод | Описание |
+|----------|-------|----------|
+| `/api/health` | GET | Проверка здоровья демона |
+| `/api/status` | GET | Текущий статус подключения |
+| `/api/connect` | POST | Подключиться к серверу |
+| `/api/disconnect` | POST | Отключиться |
+| `/api/servers` | GET | Список серверов |
+| `/api/servers/import` | POST | Импортировать сервер из конфига |
+| `/api/subscriptions` | GET/POST | Управление подписками |
+| `/api/subscriptions/refresh/{id}` | POST | Обновить подписку |
+| `/api/settings` | GET/PUT | Настройки приложения |
+| `/api/logs` | GET | Логи демона |
 
-```powershell
-# Терминал 1: запустить демон
-.\bin\tunnelcraftd.exe
+### Примеры запросов
 
-# Терминал 2: отправить gRPC-запрос (например, получить список серверов)
-# (требует grpcurl или аналогичный инструмент)
+```bash
+# Проверка здоровья
+curl http://127.0.0.1:50052/api/health
+
+# Получить статус
+curl http://127.0.0.1:50052/api/status
+
+# Добавить подписку
+curl -X POST http://127.0.0.1:50052/api/subscriptions \
+  -H "Content-Type: application/json" \
+  -d '{"name":"My VPN","url":"https://example.com/sub"}'
+
+# Получить логи
+curl http://127.0.0.1:50052/api/logs?limit=50
 ```
-
----
 
 ## Структура проекта
 
 ```
 tunnelcraft/
-├── core/                  # Go демон (tunnelcraftd)
-│   ├── cmd/tunnelcraftd/  # Точка входа
-│   ├── internal/          # Внутренние пакеты
-│   │   ├── engine/        # Управление подключениями
-│   │   ├── protocols/     # Обёртки для бинарников
-│   │   ├── tunnel/        # TUN + маршрутизация
-│   │   ├── subscription/  # Парсер подписок (AWG2/AWG3 URI, JSON, .conf, sing-box, clash)
-│   │   ├── dns/           # DNS управление
-│   │   ├── ipc/           # gRPC сервер
-│   │   └── config/        # Конфигурация (YAML)
-│   ├── go.mod
-│   └── go.sum
-├── ui/                    # Tauri 2.0 приложение
-│   ├── src-tauri/         # Rust бэкенд
-│   └── src/               # React фронтенд
-├── proto/                 # gRPC определения (tunnelcraft.proto)
-├── bin/                   # Бинарники протоколов (НЕ в git)
-├── configs/               # Шаблоны конфигов
-└── scripts/               # Утилиты (download-binaries.ps1)
+├── bin/                    # Бинарные файлы (демон и зависимости)
+│   └── tunnelcraftd.exe
+├── core/                   # Go демон
+│   ├── cmd/tunnelcraftd/   # Точка входа демона
+│   └── internal/           # Внутренние пакеты Go
+├── ui/                     # Tauri приложение
+│   ├── src/                # React frontend
+│   │   ├── components/     # UI компоненты
+│   │   ├── hooks/          # React хуки (useGrpc.ts)
+│   │   ├── pages/          # Страницы приложения
+│   │   └── stores/         # Zustand stores
+│   └── src-tauri/          # Rust backend
+│       ├── src/
+│       │   ├── main.rs     # Точка входа Tauri
+│       │   └── commands.rs # Tauri команды
+│       └── tauri.conf.json # Конфигурация Tauri
+├── build_daemon.sh         # Скрипт сборки демона
+└── README.md
 ```
+
+## Отладка
+
+### Просмотр логов демона
+
+```bash
+curl http://127.0.0.1:50052/api/logs?limit=100
+```
+
+### Проверка работы демона
+
+```bash
+curl http://127.0.0.1:50052/api/health
+```
+
+Если демон не отвечает:
+1. Проверьте, что `bin/tunnelcraftd.exe` существует
+2. Проверьте логи Tauri приложения в консоли разработчика (F12)
+3. Попробуйте запустить демон вручную (см. выше)
+
+## Сборка релиза
+
+```bash
+cd ui
+npm run tauri build
+```
+
+Это создаст установочный пакет в `ui/src-tauri/target/release/bundle/`.
+
+## Требования
+
+- Go 1.21+
+- Node.js 18+
+- Rust 1.70+ (для сборки Tauri)
+- Windows 10/11 (для работы с WireGuard и TUN адаптерами)
 
 ## Лицензия
 
-MIT — см. файл [LICENSE](LICENSE).
+MIT

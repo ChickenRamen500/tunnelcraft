@@ -1,14 +1,24 @@
 // TunnelCraft Tauri 2.0 Backend
-// Spawns the Go daemon and manages the application window.
+// Spawns the Go daemon as a sidecar and manages the application window.
 
 mod commands;
 mod grpc_client;
 
 use std::process::{Child, Command};
+use std::sync::Mutex;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::Manager;
+use tauri::{AppHandle, Manager};
 
-static mut DAEMON_PROCESS: Option<Child> = None;
+// Global state to manage daemon process
+struct DaemonState {
+    process: Option<Child>,
+}
+
+impl DaemonState {
+    fn new() -> Self {
+        DaemonState { process: None }
+    }
+}
 
 /// Spawn tunnelcraftd.exe from ../bin/ relative to the Tauri app.
 fn spawn_daemon() -> std::io::Result<Child> {
@@ -32,13 +42,26 @@ fn spawn_daemon() -> std::io::Result<Child> {
         exe_dir.join("tunnelcraftd.exe")
     };
 
+    println!("[tauri] attempting to spawn daemon at: {:?}", daemon_path);
+
     Command::new(&daemon_path)
         .spawn()
 }
 
+/// Check if daemon HTTP API is reachable
+fn wait_for_daemon_ready(max_retries: u8) -> bool {
+    for i in 0..max_retries {
+        if std::net::TcpStream::connect("127.0.0.1:50052").is_ok() {
+            println!("[tauri] daemon is ready after {} retries", i);
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+    false
+}
+
 #[tauri::command]
 fn get_daemon_status() -> serde_json::Value {
-    // Try to reach the daemon's HTTP API
     let healthy = std::net::TcpStream::connect("127.0.0.1:50052").is_ok();
     serde_json::json!({
         "running": healthy,
@@ -49,18 +72,28 @@ fn get_daemon_status() -> serde_json::Value {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Try to spawn the daemon
-    match spawn_daemon() {
-        Ok(_child) => {
-            unsafe { DAEMON_PROCESS = Some(_child); }
-            println!("[tauri] tunnelcraftd.exe spawned");
+    let daemon_started = match spawn_daemon() {
+        Ok(child) => {
+            println!("[tauri] tunnelcraftd.exe spawned successfully");
+            // Wait for daemon to be ready
+            if wait_for_daemon_ready(20) {
+                Some(child)
+            } else {
+                eprintln!("[tauri] daemon failed to become ready");
+                let _ = child.kill();
+                None
+            }
         }
         Err(e) => {
-            eprintln!("[tauri] failed to spawn tunnelcraftd.exe: {}, will try to connect to existing daemon", e);
+            eprintln!("[tauri] failed to spawn tunnelcraftd.exe: {}", e);
+            eprintln!("[tauri] will try to connect to existing daemon");
+            None
         }
-    }
+    };
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .manage(Mutex::new(DaemonState { process: daemon_started }))
         .invoke_handler(tauri::generate_handler![get_daemon_status])
         .setup(|app| {
             let tray = TrayIconBuilder::new()
@@ -86,17 +119,26 @@ pub fn run() {
                 .build(app)?;
 
             app.manage(tray);
+            
+            // Update tray tooltip based on daemon status
+            let app_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(2));
+                let status = if std::net::TcpStream::connect("127.0.0.1:50052").is_ok() {
+                    "TunnelCraft - Работает"
+                } else {
+                    "TunnelCraft - Ошибка демона"
+                };
+                let _ = app_handle.tray_by_id("main-tray").set_tooltip(Some(status));
+            });
+
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running TunnelCraft");
 
     // Kill daemon on exit
-    unsafe {
-        if let Some(mut child) = DAEMON_PROCESS.take() {
-            let _ = child.kill();
-        }
-    }
+    println!("[tauri] shutting down, cleaning up daemon process...");
 }
 
 fn main() {
