@@ -7,7 +7,7 @@ mod grpc_client;
 use std::process::{Child, Command};
 use std::sync::Mutex;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager};
+use tauri::{Manager};
 
 // Global state to manage daemon process
 struct DaemonState {
@@ -129,7 +129,9 @@ pub fn run() {
                 } else {
                     "TunnelCraft - Ошибка демона"
                 };
-                let _ = app_handle.tray_by_id("main-tray").set_tooltip(Some(status));
+                if let Some(tray) = app_handle.tray_by_id("main-tray") {
+                    let _ = tray.set_tooltip(Some(status));
+                }
             });
 
             Ok(())
