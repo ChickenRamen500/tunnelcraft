@@ -418,7 +418,7 @@ func (r *RESTServer) handleRouting(w http.ResponseWriter, req *http.Request) {
                         "enabled": rule.Enabled,
                         "action":  rule.Action,
                         "domains": rule.Domains,
-                        "ip_cidrs": rule.IPCIDRs,
+                        "ip_cidrs": rule.IPCidrs,
                 })
         }
         if rules == nil {

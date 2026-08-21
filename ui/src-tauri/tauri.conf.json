@@ -42,6 +42,10 @@
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
       }
-    }
+    },
+    "binaries": [],
+    "externalBin": [
+      "bin/tunnelcraftd"
+    ]
   }
 }
