@@ -3,34 +3,34 @@
 package main
 
 import (
-	"context"
-	"flag"
-	"log"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"time"
+        "context"
+        "flag"
+        "log"
+        "os"
+        "os/exec"
+        "path/filepath"
+        "time"
 
-	"github.com/ChickenRamen500/tunnelcraft/core/internal/config"
-	"github.com/ChickenRamen500/tunnelcraft/core/internal/dns"
-	"github.com/ChickenRamen500/tunnelcraft/core/internal/engine"
-	"github.com/ChickenRamen500/tunnelcraft/core/internal/ipc"
-	"github.com/ChickenRamen500/tunnelcraft/core/internal/protocols"
-	"github.com/ChickenRamen500/tunnelcraft/core/internal/subscription"
-	"github.com/ChickenRamen500/tunnelcraft/core/internal/tunnel"
+        "github.com/ChickenRamen500/tunnelcraft/core/internal/config"
+        "github.com/ChickenRamen500/tunnelcraft/core/internal/dns"
+        "github.com/ChickenRamen500/tunnelcraft/core/internal/engine"
+        "github.com/ChickenRamen500/tunnelcraft/core/internal/ipc"
+        "github.com/ChickenRamen500/tunnelcraft/core/internal/protocols"
+        "github.com/ChickenRamen500/tunnelcraft/core/internal/subscription"
+        "github.com/ChickenRamen500/tunnelcraft/core/internal/tunnel"
 )
 
 // Version is set at build time via -ldflags.
 var Version = "0.1.0-dev"
 
 func main() {
-	// Parse command-line flags
-	configPath := flag.String("config", "", "path to config.yaml")
-	dataDir := flag.String("data", "", "path to data directory")
-	binDir := flag.String("bin", "", "path to binaries directory")
-	wireguardPath := flag.String("wireguard", "", "path to wireguard.exe")
-	showVersion := flag.Bool("version", false, "print version and exit")
-	flag.Parse()
+        // Parse command-line flags
+        configPath := flag.String("config", "", "path to config.yaml")
+        dataDir := flag.String("data", "", "path to data directory")
+        binDir := flag.String("bin", "", "path to binaries directory")
+        wireguardPath := flag.String("wireguard", "", "path to wireguard.exe")
+        showVersion := flag.Bool("version", false, "print version and exit")
+        flag.Parse()
 
         if *showVersion {
                 log.Printf("tunnelcraftd v%s\n", Version)
@@ -172,6 +172,12 @@ func main() {
                 log.Fatalf("[fatal] failed to start gRPC server: %v", err)
         }
 
+        // 8b. Start HTTP REST API server (alongside gRPC)
+        httpServer := ipc.NewHTTPServer(cfgMgr, mgr)
+        if err := httpServer.Start(""); err != nil {
+                log.Fatalf("[fatal] failed to start HTTP server: %v", err)
+        }
+
         // 9. Start DNS proxy
         if err := dnsProxy.Start(ctx); err != nil {
                 log.Printf("[warn] DNS proxy failed to start: %v", err)
@@ -198,11 +204,12 @@ func main() {
         // Block until shutdown signal
         server.Wait()
 
-        // Cleanup on exit - disconnect VPN FIRST, then stop gRPC
+        // Cleanup on exit - disconnect VPN FIRST, then stop servers
         log.Println("[info] shutting down...")
         log.Printf("[info] disconnecting active VPN before shutdown...")
         mgr.Disconnect(true)  // force disconnect
         log.Printf("[info] VPN disconnected")
+        httpServer.Stop()
         dnsProxy.Stop()
         healthChecker.Stop()
         fallbackMgr.Stop()

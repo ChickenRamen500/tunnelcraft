@@ -1,16 +1,21 @@
-// Tauri invoke wrapper for gRPC calls.
-// Falls back to mock data when running outside Tauri (e.g. in browser).
+// HTTP client for the TunnelCraft Go daemon REST API.
+// The daemon runs on http://127.0.0.1:50052
+// Falls back to mock data when the daemon is not reachable.
+
+const API_BASE = "http://127.0.0.1:50052";
 
 export interface ConnectionStatus {
   state: string;
   server_id: string | null;
+  server_name?: string;
+  protocol?: string;
   mode: string;
   socks_port: number;
   http_port: number;
   stats: {
     bytes_uploaded: number;
     bytes_downloaded: number;
-    duration: string | null;
+    duration_seconds?: number;
   };
 }
 
@@ -61,99 +66,143 @@ export interface Settings {
   theme: string;
 }
 
-// Check if we're running inside Tauri
-const isTauri = (): boolean => {
-  return typeof window !== "undefined" && "__TAURI__" in window;
-};
-
-// Lazy-loaded invoke function
-let _invoke: Function | null = null;
-async function getInvoke(): Promise<Function> {
-  if (_invoke) return _invoke;
-  if (!isTauri()) throw new Error("Not running in Tauri");
-  const mod = await import("@tauri-apps/api/core");
-  _invoke = mod.invoke;
-  return _invoke;
+// Simple fetch wrapper with error handling
+async function api<T>(path: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: { "Content-Type": "application/json", ...options?.headers },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || `HTTP ${res.status}`);
+  }
+  return res.json();
 }
 
-// Mock defaults
-const mockStatus: ConnectionStatus = {
-  state: "DISCONNECTED",
-  server_id: null,
-  mode: "SYSTEM",
-  socks_port: 1080,
-  http_port: 8080,
-  stats: { bytes_uploaded: 0, bytes_downloaded: 0, duration: null },
-};
-
-const mockSettings: Settings = {
-  proxy_mode: "SYSTEM",
-  socks_port: 1080,
-  http_port: 8080,
-  dns_servers: "1.1.1.1,8.8.8.8",
-  auto_connect: false,
-  connect_on_startup: false,
-  kill_switch: false,
-  split_tunneling: false,
-  allow_lan: false,
-  connection_timeout: 30,
-  reconnect_attempts: 3,
-  language: "ru",
-  theme: "dark",
-};
+// Check if daemon is reachable
+export async function isDaemonAlive(): Promise<boolean> {
+  try {
+    await api<{ healthy: boolean }>("/api/health");
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export async function getConnectionStatus(): Promise<ConnectionStatus> {
-  if (!isTauri()) return mockStatus;
-  const invoke = await getInvoke();
-  return invoke<ConnectionStatus>("get_connection_status");
+  try {
+    return await api<ConnectionStatus>("/api/status");
+  } catch {
+    return {
+      state: "DISCONNECTED",
+      server_id: null,
+      mode: "SYSTEM",
+      socks_port: 1080,
+      http_port: 8080,
+      stats: { bytes_uploaded: 0, bytes_downloaded: 0 },
+    };
+  }
 }
 
 export async function connectServer(serverId: string): Promise<any> {
-  if (!isTauri()) return { state: "CONNECTED", server_id: serverId };
-  const invoke = await getInvoke();
-  return invoke("connect_server", { serverId });
+  return api("/api/connect", {
+    method: "POST",
+    body: JSON.stringify({ server_id: serverId }),
+  });
 }
 
 export async function disconnectServer(force = false): Promise<any> {
-  if (!isTauri()) return { state: "DISCONNECTED" };
-  const invoke = await getInvoke();
-  return invoke("disconnect_server", { force });
+  return api("/api/disconnect", {
+    method: "POST",
+    body: JSON.stringify({ force }),
+  });
 }
 
 export async function listServers(): Promise<{ servers: Server[]; total: number }> {
-  if (!isTauri()) return { servers: [], total: 0 };
-  const invoke = await getInvoke();
-  return invoke("list_servers");
+  try {
+    return await api("/api/servers");
+  } catch {
+    return { servers: [], total: 0 };
+  }
+}
+
+export async function importServer(content: string, subscriptionId?: string): Promise<any> {
+  return api("/api/servers/import", {
+    method: "POST",
+    body: JSON.stringify({ content, subscription_id: subscriptionId || "" }),
+  });
 }
 
 export async function listSubscriptions(): Promise<{ subscriptions: Subscription[] }> {
-  if (!isTauri()) return { subscriptions: [] };
-  const invoke = await getInvoke();
-  return invoke("list_subscriptions");
+  try {
+    return await api("/api/subscriptions");
+  } catch {
+    return { subscriptions: [] };
+  }
+}
+
+export async function addSubscription(name: string, url: string): Promise<any> {
+  return api("/api/subscriptions", {
+    method: "POST",
+    body: JSON.stringify({ name, url }),
+  });
 }
 
 export async function refreshSubscription(id: string): Promise<any> {
-  if (!isTauri()) return { added: 0, updated: 0, removed: 0 };
-  const invoke = await getInvoke();
-  return invoke("refresh_subscription", { id });
+  return api(`/api/subscriptions/refresh/${id}`, { method: "POST" });
 }
 
 export async function getSettings(): Promise<Settings> {
-  if (!isTauri()) return { ...mockSettings };
-  const invoke = await getInvoke();
-  return invoke<Settings>("get_settings");
+  try {
+    return await api<Settings>("/api/settings");
+  } catch {
+    return {
+      proxy_mode: "SYSTEM",
+      socks_port: 1080,
+      http_port: 8080,
+      dns_servers: "1.1.1.1,8.8.8.8",
+      auto_connect: false,
+      connect_on_startup: false,
+      kill_switch: false,
+      split_tunneling: false,
+      allow_lan: false,
+      connection_timeout: 30,
+      reconnect_attempts: 3,
+      language: "ru",
+      theme: "dark",
+    };
+  }
+}
+
+export async function saveSettings(settings: Partial<Settings>): Promise<void> {
+  await api("/api/settings", {
+    method: "PUT",
+    body: JSON.stringify(settings),
+  });
 }
 
 export async function getRoutingRules(): Promise<any> {
-  if (!isTauri()) return { domain_strategy: "IPIfNonMatch", rules: [] };
-  const invoke = await getInvoke();
-  return invoke("get_routing_rules");
+  try {
+    return await api("/api/settings");
+  } catch {
+    return { domain_strategy: "IPIfNonMatch", rules: [] };
+  }
+}
+
+export async function getLogs(limit = 100): Promise<{ logs: string[]; count: number }> {
+  try {
+    return await api(`/api/logs?limit=${limit}`);
+  } catch {
+    return { logs: [], count: 0 };
+  }
 }
 
 export async function healthCheck(): Promise<{ healthy: boolean; version: string }> {
-  if (!isTauri()) return { healthy: true, version: "0.1.0" };
-  const invoke = await getInvoke();
-  return invoke("health_check");
+  try {
+    return await api("/api/health");
+  } catch {
+    return { healthy: false, version: "?" };
+  }
 }
 
 // Format bytes to human-readable

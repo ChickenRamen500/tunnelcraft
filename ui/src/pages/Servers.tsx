@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
-import { Search, Star, RefreshCw, Filter } from "lucide-react";
+import { Search, Star, RefreshCw, Filter, Upload } from "lucide-react";
 import { useConnectionStore } from "@/stores/connection";
-import { listServers, connectServer, type Server } from "@/hooks/useGrpc";
+import { listServers, connectServer, importServer, type Server } from "@/hooks/useGrpc";
 import ServerCard from "@/components/ServerCard";
 
 export default function Servers() {
@@ -9,6 +9,8 @@ export default function Servers() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("all");
   const [loading, setLoading] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importContent, setImportContent] = useState("");
 
   const fetchServers = async () => {
     setLoading(true);
@@ -32,6 +34,19 @@ export default function Servers() {
       await connectServer(server.id);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importContent.trim()) return;
+    try {
+      await importServer(importContent);
+      await fetchServers();
+      setShowImport(false);
+      setImportContent("");
+    } catch (e) {
+      console.error("Import failed:", e);
+      alert("Не удалось импортировать: " + (e instanceof Error ? e.message : e));
     }
   };
 
@@ -71,13 +86,21 @@ export default function Servers() {
       <div className="px-6 py-4 border-b border-[var(--border-color)]">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold">Серверы</h2>
-          <button
-            onClick={fetchServers}
-            className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-          >
-            <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
-            Обновить
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowImport(!showImport)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-300 text-xs hover:bg-purple-500/20 transition-colors"
+            >
+              <Upload size={14} /> Импорт
+            </button>
+            <button
+              onClick={fetchServers}
+              className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+              Обновить
+            </button>
+          </div>
         </div>
 
         {/* Search */}
@@ -122,6 +145,35 @@ export default function Servers() {
           ))}
         </div>
       </div>
+
+      {/* Import dialog */}
+      {showImport && (
+        <div className="px-6 py-4 border-b border-[var(--border-color)] bg-[var(--bg-secondary)]">
+          <div className="space-y-3">
+            <textarea
+              value={importContent}
+              onChange={(e) => setImportContent(e.target.value)}
+              placeholder="Вставьте содержимое .conf файла, amnezia:// URI или ссылку подписки..."
+              rows={6}
+              className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-purple-500/40 resize-none font-mono"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleImport}
+                className="px-4 py-1.5 rounded-lg bg-purple-500 text-white text-xs hover:bg-purple-600 transition-colors"
+              >
+                Импортировать
+              </button>
+              <button
+                onClick={() => { setShowImport(false); setImportContent(""); }}
+                className="px-4 py-1.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-muted)] text-xs hover:text-[var(--text-primary)] transition-colors"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Server list */}
       <div className="flex-1 overflow-y-auto p-4 space-y-1.5">

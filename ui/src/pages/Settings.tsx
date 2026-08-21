@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useConnectionStore } from "@/stores/connection";
-import { getSettings, type Settings } from "@/hooks/useGrpc";
+import { getSettings, saveSettings, type Settings } from "@/hooks/useGrpc";
 import { Shield, Globe, Zap, Monitor, Languages, Palette, RotateCcw } from "lucide-react";
 
 export default function Settings() {
@@ -12,10 +12,15 @@ export default function Settings() {
     getSettings().then(setSettings).catch(console.error);
   }, []);
 
-  const handleSave = () => {
-    // TODO: call gRPC UpdateSettings
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    try {
+      await saveSettings(settings);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      console.error("Failed to save settings:", e);
+      alert("Не удалось сохранить: " + (e instanceof Error ? e.message : e));
+    }
   };
 
   if (!settings) {

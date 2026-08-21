@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus, RefreshCw, Trash2, ExternalLink, CheckCircle, XCircle } from "lucide-react";
-import { listSubscriptions, refreshSubscription, type Subscription } from "@/hooks/useGrpc";
+import { listSubscriptions, addSubscription, refreshSubscription, type Subscription } from "@/hooks/useGrpc";
 
 export default function Subscriptions() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -34,12 +34,18 @@ export default function Subscriptions() {
     }
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newUrl) return;
-    // TODO: call gRPC CreateSubscription
-    setShowAdd(false);
-    setNewUrl("");
-    setNewName("");
+    try {
+      await addSubscription(newName || "Подписка", newUrl);
+      await fetchSubs();
+      setShowAdd(false);
+      setNewUrl("");
+      setNewName("");
+    } catch (e) {
+      console.error("Failed to add subscription:", e);
+      alert("Не удалось добавить подписку: " + (e instanceof Error ? e.message : e));
+    }
   };
 
   return (
