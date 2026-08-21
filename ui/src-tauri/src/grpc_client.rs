@@ -1,36 +1,22 @@
 // gRPC client that connects to the TunnelCraft Go daemon.
-// Since we can't compile proto files in this environment,
-// we use raw HTTP/2 + JSON to communicate with the gRPC server.
-// In production, use tonic with generated proto code.
+// Currently returns mock data. Will be replaced with tonic-generated
+// gRPC client once proto compilation is set up.
 
-use anyhow::Result;
 use serde_json::{json, Value};
-use std::time::Duration;
 
 pub struct GrpcClient {
     addr: String,
-    client: reqwest::blocking::Client,
 }
-
-// We use a simple HTTP approach for the gRPC calls.
-// In production, replace with tonic-generated client.
 
 impl GrpcClient {
     pub fn new(addr: &str) -> Self {
-        let client = reqwest::blocking::Client::builder()
-            .timeout(Duration::from_secs(10))
-            .build()
-            .expect("failed to create HTTP client");
-
         Self {
             addr: addr.to_string(),
-            client,
         }
     }
 
     /// Check if the daemon is reachable.
     pub fn is_daemon_alive(&self) -> bool {
-        // Try a simple health check
         self.health_check().is_ok()
     }
 
@@ -38,7 +24,6 @@ impl GrpcClient {
 
     pub fn get_connection_status(&self) -> Result<Value, String> {
         // TODO: replace with tonic gRPC call
-        // For now, return a mock disconnected status
         Ok(json!({
             "state": "DISCONNECTED",
             "server_id": null,
@@ -53,7 +38,7 @@ impl GrpcClient {
         }))
     }
 
-    pub async fn connect_server(&self, server_id: &str) -> Result<Value, String> {
+    pub fn connect_server(&self, server_id: &str) -> Result<Value, String> {
         // TODO: replace with tonic gRPC call to TunnelService.Connect
         Ok(json!({
             "state": "CONNECTED",
@@ -64,7 +49,7 @@ impl GrpcClient {
         }))
     }
 
-    pub async fn disconnect_server(&self, _force: bool) -> Result<Value, String> {
+    pub fn disconnect_server(&self, _force: bool) -> Result<Value, String> {
         // TODO: replace with tonic gRPC call to TunnelService.Disconnect
         Ok(json!({
             "state": "DISCONNECTED",
@@ -91,7 +76,7 @@ impl GrpcClient {
         }))
     }
 
-    pub async fn refresh_subscription(&self, _id: &str) -> Result<Value, String> {
+    pub fn refresh_subscription(&self, _id: &str) -> Result<Value, String> {
         // TODO: replace with tonic gRPC call to SubscriptionService.RefreshSubscription
         Ok(json!({
             "added": 0,

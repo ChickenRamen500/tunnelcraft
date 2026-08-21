@@ -1,10 +1,9 @@
 // TunnelCraft Tauri 2.0 Backend
 // Connects to the Go daemon via gRPC and exposes commands to the React frontend.
 
-mod grpc_client;
 mod commands;
+mod grpc_client;
 
-use commands::*;
 use grpc_client::GrpcClient;
 use std::sync::Mutex;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -17,15 +16,15 @@ fn get_connection_status(client: tauri::State<'_, Mutex<GrpcClient>>) -> Result<
 }
 
 #[tauri::command]
-async fn connect_server(server_id: String, client: tauri::State<'_, Mutex<GrpcClient>>) -> Result<serde_json::Value, String> {
+fn connect_server(server_id: String, client: tauri::State<'_, Mutex<GrpcClient>>) -> Result<serde_json::Value, String> {
     let client = client.lock().map_err(|e| e.to_string())?;
-    client.connect_server(&server_id).await
+    client.connect_server(&server_id)
 }
 
 #[tauri::command]
-async fn disconnect_server(force: bool, client: tauri::State<'_, Mutex<GrpcClient>>) -> Result<serde_json::Value, String> {
+fn disconnect_server(force: bool, client: tauri::State<'_, Mutex<GrpcClient>>) -> Result<serde_json::Value, String> {
     let client = client.lock().map_err(|e| e.to_string())?;
-    client.disconnect_server(force).await
+    client.disconnect_server(force)
 }
 
 #[tauri::command]
@@ -41,9 +40,9 @@ fn list_subscriptions(client: tauri::State<'_, Mutex<GrpcClient>>) -> Result<ser
 }
 
 #[tauri::command]
-async fn refresh_subscription(id: String, client: tauri::State<'_, Mutex<GrpcClient>>) -> Result<serde_json::Value, String> {
+fn refresh_subscription(id: String, client: tauri::State<'_, Mutex<GrpcClient>>) -> Result<serde_json::Value, String> {
     let client = client.lock().map_err(|e| e.to_string())?;
-    client.refresh_subscription(&id).await
+    client.refresh_subscription(&id)
 }
 
 #[tauri::command]
