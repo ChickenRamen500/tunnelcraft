@@ -787,6 +787,18 @@ func ParseWireGuardConf(text string) (engine.ServerConfig, error) {
                 if cfg.AmneziaPrivateKey == "" {
                         cfg.AmneziaPrivateKey = cfg.WGPrivateKey
                 }
+                if cfg.AmneziaPublicKey == "" {
+                        cfg.AmneziaPublicKey = cfg.WGPublicKey
+                }
+                if cfg.AmneziaPresharedKey == "" {
+                        cfg.AmneziaPresharedKey = cfg.WGPresharedKey
+                }
+                if cfg.AmneziaLocalAddr == "" {
+                        cfg.AmneziaLocalAddr = cfg.WGLocalAddress
+                }
+                if cfg.AmneziaDNS == "" {
+                        cfg.AmneziaDNS = cfg.WGDNSServers
+                }
         }
 
         return cfg, nil
@@ -1250,9 +1262,11 @@ type clashProxy struct {
         DownMbps int    `yaml:"down"`
         Obfs     string `yaml:"obfs"`
 
-        // WireGuard.
+        // WireGuard / AmneziaWG — share the same YAML tag as Reality public-key.
+        // NOTE: Only ONE field can map to "public-key" in the struct, otherwise
+        // yaml.v3 gives the value to the first field and the second stays empty.
+        // We reuse the Reality Publickey field (defined above) for WG/AWG too.
         PrivateKey   string `yaml:"private-key"`
-        PublicKey    string `yaml:"public-key"`
         PresharedKey string `yaml:"preshared-key"`
         IP          string `yaml:"ip"`
         DNS         string `yaml:"dns"`
@@ -1370,7 +1384,7 @@ func clashProxyToConfig(p *clashProxy) (engine.ServerConfig, error) {
         case "wireguard":
                 cfg.Protocol = engine.ProtocolWireGuard
                 cfg.WGPrivateKey = p.PrivateKey
-                cfg.WGPublicKey = p.PublicKey
+                cfg.WGPublicKey = p.Publickey
                 cfg.WGPresharedKey = p.PresharedKey
                 cfg.WGLocalAddress = p.IP
                 cfg.WGDNSServers = p.DNS
@@ -1379,7 +1393,7 @@ func clashProxyToConfig(p *clashProxy) (engine.ServerConfig, error) {
         case "amnezia-wg", "amnezia-wireguard":
                 cfg.Protocol = engine.ProtocolAmneziaWG
                 cfg.AmneziaPrivateKey = p.PrivateKey
-                cfg.AmneziaPublicKey = p.PublicKey
+                cfg.AmneziaPublicKey = p.Publickey
                 cfg.AmneziaPresharedKey = p.PresharedKey
                 cfg.AmneziaLocalAddr = p.IP
                 cfg.AmneziaDNS = p.DNS
