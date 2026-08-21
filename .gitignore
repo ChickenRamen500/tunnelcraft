@@ -1,17 +1,9 @@
 ```
 # Build artifacts
 target/
-**/target/
 
 # Dependencies
 Cargo.lock
-**/Cargo.lock
-
-# Tauri specific
-.ui/
-**/.ui/
-.svelte-kit/
-**/.svelte-kit/
 
 # Logs and temp files
 *.log
@@ -37,39 +29,25 @@ coverage/
 htmlcov/
 .coverage
 
-# Python (if applicable)
+# Python specific
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .Python
 *.so
-.Python
 *.egg-info/
 .eggs/
-dist/
-build/
-*.egg
-.tox/
-.nox/
-.pytest_cache/
-.mypy_cache/
-.hypothesis/
 
-# Node.js (if applicable)
+# Node.js specific
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnp/
-.pnp.js
-.next/
-.nuxt/
-.vuepress/dist/
-.static/
-.postcss-cache/
 
 # Rust specific
-Cargo.lock
-**/Cargo.lock
+**/*.rs.bk
+
+# Tauri specific
+.ui/
 ```
