@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useState } from "react";
 import { Power, ArrowDown, ArrowUp, Clock, Zap, AlertTriangle } from "lucide-react";
 import { useConnectionStore } from "@/stores/connection";
-import { getConnectionStatus, connectServer, disconnectServer, formatBytes } from "@/hooks/useGrpc";
+import { getConnectionStatus, connectServer, disconnectServer, formatBytes } from "@/hooks/useApi";
 import StatusBadge from "@/components/StatusBadge";
 import SpeedGraph from "@/components/SpeedGraph";
 
@@ -161,7 +161,7 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-1.5">
             <Clock size={12} />
-            <span>{status.stats.duration ? formatDuration2(status.stats.duration) : "--:--:--"}</span>
+            <span>{status.stats.duration_seconds ? formatDuration2(status.stats.duration_seconds) : "--:--:--"}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <Zap size={12} />

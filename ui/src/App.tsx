@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { LayoutDashboard, Server, Rss, GitBranch, Settings, Activity } from "lucide-react";
+import { LayoutDashboard, Server, Rss, GitBranch, Settings, Activity, FileText } from "lucide-react";
 import { useConnectionStore } from "@/stores/connection";
-import { getConnectionStatus } from "@/hooks/useGrpc";
+import { getConnectionStatus } from "@/hooks/useApi";
 import Dashboard from "@/pages/Dashboard";
 import Servers from "@/pages/Servers";
 import Subscriptions from "@/pages/Subscriptions";
 import SplitTunnel from "@/pages/SplitTunnel";
 import SettingsPage from "@/pages/Settings";
+import Logs from "@/pages/Logs";
 import StatusBadge from "@/components/StatusBadge";
 
 const tabs = [
@@ -14,6 +15,7 @@ const tabs = [
   { id: "servers", label: "Серверы", icon: Server },
   { id: "subscriptions", label: "Подписки", icon: Rss },
   { id: "split-tunnel", label: "Маршруты", icon: GitBranch },
+  { id: "logs", label: "Логи", icon: FileText },
   { id: "settings", label: "Настройки", icon: Settings },
 ] as const;
 
@@ -83,6 +85,9 @@ export default function App() {
           </div>
           <div className={activeTab === "split-tunnel" ? "contents" : "hidden"}>
             <SplitTunnel />
+          </div>
+          <div className={activeTab === "logs" ? "contents" : "hidden"}>
+            <Logs />
           </div>
           <div className={activeTab === "settings" ? "contents" : "hidden"}>
             <SettingsPage />

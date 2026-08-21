@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { Search, Star, RefreshCw, Filter, Upload } from "lucide-react";
 import { useConnectionStore } from "@/stores/connection";
-import { listServers, connectServer, importServer, type Server } from "@/hooks/useGrpc";
+import { listServers, connectServer, importServer, type Server } from "@/hooks/useApi";
 import ServerCard from "@/components/ServerCard";
 
 export default function Servers() {

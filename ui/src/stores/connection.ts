@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ConnectionStatus, Server } from "@/hooks/useGrpc";
+import type { ConnectionStatus, Server } from "@/hooks/useApi";
 
 interface ConnectionState {
   status: ConnectionStatus;

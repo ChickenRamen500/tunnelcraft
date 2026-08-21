@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus, RefreshCw, Trash2, ExternalLink, CheckCircle, XCircle } from "lucide-react";
-import { listSubscriptions, addSubscription, refreshSubscription, type Subscription } from "@/hooks/useGrpc";
+import { listSubscriptions, addSubscription, refreshSubscription, type Subscription } from "@/hooks/useApi";
 
 export default function Subscriptions() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
