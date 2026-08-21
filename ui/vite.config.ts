@@ -13,5 +13,11 @@ export default defineConfig(async () => ({
   server: {
     port: 5173,
     strictPort: true,
+    watch: {
+      // Ignore the Cargo target/ directory to prevent EBUSY errors.
+      // Cargo locks .dll files during compilation, which makes Vite's
+      // file watcher crash with "resource busy or locked".
+      ignored: ["**/src-tauri/target/**"],
+    },
   },
 }));
