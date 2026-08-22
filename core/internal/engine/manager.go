@@ -329,7 +329,7 @@ func (m *Manager) findServer(id string) *ServerConfig {
         return nil
 }
 
-// TODO: implement createHandler — dispatches to the correct protocol wrapper
+// createHandler dispatches to the correct protocol wrapper.
 func (m *Manager) createHandler(p Protocol) (ProtocolHandler, error) {
         if m.protoHandlers != nil {
                 if h, ok := m.protoHandlers[p]; ok {

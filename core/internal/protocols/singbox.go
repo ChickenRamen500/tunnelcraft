@@ -416,7 +416,7 @@ func (s *SingBoxHandler) buildRoute(settings *protos.Settings) map[string]interf
 	}
 
 	// Add geoip-ru rule if bypass_ru is enabled
-	if settings != nil && settings.Routing.BypassRu {
+	if settings != nil && settings.RoutingSettings != nil && settings.RoutingSettings.BypassRu {
 		rules = append(rules, map[string]interface{}{
 			"rule_set": "geoip-ru",
 			"outbound": "direct",
@@ -438,7 +438,7 @@ func (s *SingBoxHandler) buildRoute(settings *protos.Settings) map[string]interf
 	}
 
 	// Add rule_set for geoip-ru if bypass_ru is enabled
-	if settings != nil && settings.Routing.BypassRu {
+	if settings != nil && settings.RoutingSettings != nil && settings.RoutingSettings.BypassRu {
 		routeCfg["rule_set"] = []map[string]interface{}{
 			{
 				"type":              "remote",
