@@ -26,8 +26,8 @@ func NewSingBoxHandler(binPath string) *SingBoxHandler {
 }
 
 // Start generates a sing-box JSON config from the server config and launches sing-box.exe.
-func (s *SingBoxHandler) Start(ctx context.Context, server *engine.ServerConfig, tunMode bool, localProxyPort uint32) error {
-	return s.StartWithSettings(ctx, server, tunMode, localProxyPort, nil)
+func (s *SingBoxHandler) Start(ctx context.Context, server *engine.ServerConfig, socksPort, httpPort uint32) error {
+	return s.StartWithSettings(ctx, server, true, socksPort, nil)
 }
 
 // StartWithSettings generates a sing-box JSON config with user settings and launches sing-box.exe.
@@ -136,16 +136,18 @@ func (s *SingBoxHandler) buildProxyOutbound(server *engine.ServerConfig) map[str
 	switch server.Protocol {
 	case engine.ProtocolVLESS:
 		outbound = s.buildVLESS(server)
-	case "trojan":
+	case engine.ProtocolTrojan:
 		outbound = s.buildTrojan(server)
 	case engine.ProtocolVMESS:
 		outbound = s.buildVMess(server)
-	case "hysteria2":
+	case engine.ProtocolHysteria2:
 		outbound = s.buildHysteria2(server)
 	case engine.ProtocolHysteria:
 		outbound = s.buildHysteria(server)
-	case "shadowsocks":
+	case engine.ProtocolShadowsocks:
 		outbound = s.buildShadowsocks(server)
+	case engine.ProtocolTuic:
+		outbound = s.buildTuic(server)
 	default:
 		s.appendLog("[sing-box] unsupported protocol: %s", server.Protocol)
 		return nil
@@ -283,6 +285,29 @@ func (s *SingBoxHandler) buildShadowsocks(server *engine.ServerConfig) map[strin
 		"method":       "aes-256-gcm",
 		"password":     server.HysteriaAuth,
 	}
+}
+
+func (s *SingBoxHandler) buildTuic(server *engine.ServerConfig) map[string]interface{} {
+	outbound := map[string]interface{}{
+		"type":         "tuic",
+		"tag":          "proxy-main",
+		"server":       server.Host,
+		"server_port":  server.Port,
+		"uuid":         server.UUID,
+		"password":     server.HysteriaAuth,
+	}
+
+	tlsConfig := map[string]interface{}{
+		"enabled":     true,
+		"server_name": server.HysteriaSNI,
+		"insecure":    server.HysteriaInsecure,
+	}
+	if server.HysteriaALPN != "" {
+		tlsConfig["alpn"] = []string{server.HysteriaALPN}
+	}
+	outbound["tls"] = tlsConfig
+
+	return outbound
 }
 
 // buildTLS constructs TLS or REALITY settings.

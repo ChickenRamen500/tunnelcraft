@@ -1,20 +1,37 @@
-# Зависимости Node.js
-ui/node_modules/
-ui/dist/
-ui/build/
-
-*.dylib
+```
+# Compiled and binary files
+*.o
+*.obj
+*.exe
+*.dll
 *.so
+*.a
+*.out
 
-# Временные файлы и IDE
-.idea/
-.vscode/
+# Dependencies
+vendor/
+
+# Logs and temp files
+*.log
+*.tmp
 *.swp
-*.swo
-*~
 
-# Конфиги данных (если они генерируются рантаймом)
-core/data/*.json
-/ui/src-tauri/target/debug
-bin/tunnelcraftd.exe
-bin/.gitkeep
+# Environment
+.env
+.env.local
+.env.*
+
+# Editors
+.vscode/
+.idea/
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Build artifacts
+dist/
+build/
+target/
+```

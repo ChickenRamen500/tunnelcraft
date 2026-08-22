@@ -49,11 +49,15 @@ func (s ConnectionState) String() string {
 type Protocol string
 
 const (
-        ProtocolVLESS     Protocol = "vless"
-        ProtocolVMESS     Protocol = "vmess"
-        ProtocolWireGuard Protocol = "wireguard"
-        ProtocolHysteria  Protocol = "hysteria"
-        ProtocolAmneziaWG Protocol = "amneziawg"
+        ProtocolVLESS       Protocol = "vless"
+        ProtocolVMESS       Protocol = "vmess"
+        ProtocolTrojan      Protocol = "trojan"
+        ProtocolShadowsocks Protocol = "shadowsocks"
+        ProtocolHysteria    Protocol = "hysteria"
+        ProtocolHysteria2   Protocol = "hysteria2"
+        ProtocolWireGuard   Protocol = "wireguard"
+        ProtocolAmneziaWG   Protocol = "amneziawg"
+        ProtocolTuic        Protocol = "tuic"
 )
 
 // ServerConfig is the unified server configuration used internally.

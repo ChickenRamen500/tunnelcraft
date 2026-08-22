@@ -108,11 +108,15 @@ func main() {
 
         // 1. Protocol handlers
         protoHandlers := map[engine.Protocol]engine.ProtocolHandler{
-                engine.ProtocolVLESS:     protocols.NewXrayHandler(filepath.Join(*binDir, "xray-core.exe")),
-                engine.ProtocolVMESS:     protocols.NewXrayHandler(filepath.Join(*binDir, "xray-core.exe")),
-                engine.ProtocolWireGuard: protocols.NewWireGuardHandler(wireguardExePath),
-                engine.ProtocolHysteria:  protocols.NewHysteriaHandler(filepath.Join(*binDir, "hysteria.exe")),
-                engine.ProtocolAmneziaWG: protocols.NewAmneziaHandler(filepath.Join(*binDir, "amneziawg-go.exe")),
+                engine.ProtocolVLESS:         protocols.NewSingBoxHandler(filepath.Join(*binDir, "sing-box.exe")),
+                engine.ProtocolVMESS:         protocols.NewSingBoxHandler(filepath.Join(*binDir, "sing-box.exe")),
+                engine.ProtocolTrojan:        protocols.NewSingBoxHandler(filepath.Join(*binDir, "sing-box.exe")),
+                engine.ProtocolShadowsocks:   protocols.NewSingBoxHandler(filepath.Join(*binDir, "sing-box.exe")),
+                engine.ProtocolHysteria2:     protocols.NewSingBoxHandler(filepath.Join(*binDir, "sing-box.exe")),
+                engine.ProtocolTuic:          protocols.NewSingBoxHandler(filepath.Join(*binDir, "sing-box.exe")),
+                engine.ProtocolWireGuard:     protocols.NewWireGuardHandler(wireguardExePath),
+                engine.ProtocolHysteria:      protocols.NewHysteriaHandler(filepath.Join(*binDir, "hysteria.exe")),
+                engine.ProtocolAmneziaWG:     protocols.NewAmneziaHandler(filepath.Join(*binDir, "amneziawg-go.exe")),
         }
 
         // 2. Connection manager
