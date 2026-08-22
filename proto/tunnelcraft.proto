@@ -28,6 +28,8 @@ enum Protocol {
   PROTOCOL_HYSTERIA     = 6;
   PROTOCOL_AMNEZIAWG    = 7;
   PROTOCOL_SSH          = 8;
+  PROTOCOL_HYSTERIA2    = 9;
+  PROTOCOL_TUIC         = 10;
 }
 
 // Transport layer used by Xray-family protocols.
@@ -236,6 +238,86 @@ message SSHConfig {
   string key_passphrase = 4;
 }
 
+// ProxyConfig holds unified proxy protocol fields for VLESS/Trojan/VMESS/Hysteria2/TUIC.
+// Used with sing-box and xray sidecars.
+message ProxyConfig {
+  // Protocol type.
+  Protocol protocol = 1;
+  // Server address (IP or domain).
+  string address = 2;
+  // Server port.
+  int32 port = 3;
+  // UUID for VLESS/VMESS/TUIC.
+  string uuid = 4;
+  // Password for Trojan/Shadowsocks/Hysteria2/TUIC.
+  string password = 5;
+  // Transport: tcp, ws, grpc, h2, httpupgrade, kcp, xhttp, quic
+  string network = 6;
+  // Path for WS/HTTPUpgrade/H2/XHTTP.
+  string path = 7;
+  // Host header for WS/HTTPUpgrade/H2.
+  string host = 8;
+  // gRPC service name.
+  string grpc_service_name = 9;
+  // Security: none, tls, reality
+  string security = 10;
+  // SNI for TLS/REALITY.
+  string sni = 11;
+  // TLS fingerprint (chrome/firefox/curl).
+  string fingerprint = 12;
+  // REALITY public key.
+  string reality_public_key = 13;
+  // REALITY short ID.
+  string reality_short_id = 14;
+  // Flow for XTLS (e.g. xtls-rprx-vision).
+  string flow = 15;
+  // Allow insecure TLS (skip cert verify).
+  bool allow_insecure = 16;
+  // Hysteria obfs type.
+  string obfs = 17;
+  // Hysteria auth string.
+  string auth = 18;
+  // Hysteria uplink Mbps.
+  int32 up_mbps = 19;
+  // Hysteria downlink Mbps.
+  int32 down_mbps = 20;
+}
+
+// RoutingSettings holds routing / split-tunnel settings.
+message RoutingSettings {
+  bool bypass_ru = 1;       // Route .ru/.рф domains direct
+  bool block_ipv6 = 2;      // Block IPv6 traffic
+  bool dns_via_tunnel = 3;  // DNS queries go through tunnel
+  bool bypass_local = 4;    // Local LAN traffic direct
+}
+
+// MaskingSettings holds protocol masking / obfuscation settings.
+message MaskingSettings {
+  bool enabled = 1;           // Masking enabled
+  string fingerprint = 2;     // chrome | firefox | curl
+  string sni_domain = 3;      // Cover domain (e.g. ozon.ru)
+  int32 junk_min_ms = 4;      // Min junk packet delay
+  int32 junk_max_ms = 5;      // Max junk packet delay
+  bool i_packets = 6;         // Send I-packets (I1-I5)
+}
+
+// DnsProvider is a single DNS resolver.
+message DnsProvider {
+  string name = 1;   // e.g. "Cloudflare"
+  string kind = 2;   // doh | dot | plain
+  string addr = 3;   // URL for DoH, host:port for DoT/plain
+}
+
+// DnsChainSettings holds layered DNS resolution chain.
+message DnsChainSettings {
+  bool enabled = 1;
+  repeated DnsProvider doh = 2;    // Layer 1: DNS over HTTPS
+  repeated DnsProvider dot = 3;    // Layer 2: DNS over TLS
+  repeated DnsProvider plain = 4;  // Layer 3: Plain DNS
+  int32 deadline_ms = 5;           // Total timeout
+  int32 per_attempt_ms = 6;        // Per-provider timeout
+}
+
 // A remote VPN server entry.
 message Server {
   string id          = 1;  // client-generated UUID
@@ -251,10 +333,11 @@ message Server {
     ShadowsocksConfig shadowsocks = 13;
     AmneziaWGConfig  amneziawg = 14;
     SSHConfig        ssh       = 15;
+    ProxyConfig      proxy     = 30;  // Unified proxy config for sing-box/xray
   }
 
   GeoLocation geo       = 20;
- ServerStatus status    = 21;
+  ServerStatus status    = 21;
   bool   favorite       = 22;
   uint32 sort_order     = 23;
   repeated string tags  = 24;
@@ -336,6 +419,11 @@ message Settings {
   string   theme                = 18;  // "system", "light", "dark"
   string   active_server_id     = 19;
   RoutingConfig routing        = 20;
+  // New fields for proxy protocols support
+  RoutingSettings routing_settings = 21;
+  MaskingSettings masking          = 22;
+  DnsChainSettings dns_chain       = 23;
+  int32 sub_update_interval_min    = 24;  // Subscription update interval (minutes), 0 = disabled
 }
 
 // ----------------------------------------------------------------------------
