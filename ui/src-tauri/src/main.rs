@@ -182,7 +182,6 @@ pub fn run() {
                 .build(app)?;
 
             // Update tray tooltip based on daemon status
-            let tray_handle = tray.app_handle().clone();
             std::thread::spawn(move || {
                 std::thread::sleep(std::time::Duration::from_secs(2));
                 let status =
@@ -191,7 +190,7 @@ pub fn run() {
                     } else {
                         "TunnelCraft - Ошибка демона"
                     };
-                let _ = tray_handle.set_tooltip(Some(status));
+                let _ = tray.set_tooltip(Some(status));
             });
 
             // Hide to tray on window close instead of quitting
