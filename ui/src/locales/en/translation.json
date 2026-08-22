@@ -1,0 +1,102 @@
+{
+  "translation": {
+    "app": {
+      "title": "TunnelCraft",
+      "version": "v0.1.0"
+    },
+    "nav": {
+      "dashboard": "Dashboard",
+      "servers": "Servers",
+      "subscriptions": "Subscriptions",
+      "split_tunnel": "Split Tunnel",
+      "settings": "Settings",
+      "logs": "Logs"
+    },
+    "servers": {
+      "title": "Servers",
+      "search_placeholder": "Search servers...",
+      "import": "Import",
+      "refresh": "Refresh",
+      "all": "All",
+      "favorites": "Favorites",
+      "no_servers": "No servers found",
+      "no_servers_hint": "Add a subscription or server manually",
+      "connect": "Connect",
+      "disconnect": "Disconnect",
+      "ping": "Ping",
+      "country": "Country",
+      "protocol": "Protocol",
+      "sort_by": "Sort by",
+      "sort_ping": "By Ping",
+      "sort_name": "By Name",
+      "sort_country": "By Country",
+      "group_by_country": "Group by Country"
+    },
+    "settings": {
+      "title": "Settings",
+      "emergency_reset": "Emergency Reset",
+      "emergency_reset_desc": "Stop all processes, remove proxy, delete temp files",
+      "emergency_reset_confirm": "Are you sure? This will disconnect VPN.",
+      "language": "Language",
+      "english": "English",
+      "russian": "Русский",
+      "xray_subscriptions": "Xray Subscriptions",
+      "update_interval": "Update Interval (min)",
+      "update_interval_desc": "0 = disabled, values <5 round to 5",
+      "masking_global": "Masking (Global)",
+      "auto_masking": "Auto-adjust parameters on failed connection",
+      "masking_enabled_default": "Masking enabled by default",
+      "fingerprint": "Browser Fingerprint",
+      "cover_domain": "Cover Domain SNI",
+      "junk_delay_min": "Junk packets delay min (ms)",
+      "junk_delay_max": "Junk packets delay max (ms)",
+      "i_packets": "Send I-packets (I1–I5)",
+      "local_traffic": "Local traffic bypass VPN",
+      "dns_resolve": "DNS Endpoint Resolution",
+      "trusted_dns": "Trusted DNS Resolver",
+      "dns_https": "DNS over HTTPS",
+      "dns_tls": "DNS over TLS",
+      "dns_plain": "Plain DNS",
+      "add_custom": "+ Custom",
+      "deadline_ms": "Global Deadline (ms)",
+      "per_attempt_ms": "Per Attempt (ms)",
+      "test_resolve": "Test Resolution",
+      "test_resolve_btn": "Test",
+      "show_result": "Show Result",
+      "use_existing_domain": "Use domain from existing configs"
+    },
+    "routing": {
+      "title": "Routing",
+      "bypass_ru": "RU Bypass VPN",
+      "block_ipv6": "Block IPv6",
+      "dns_via_tunnel": "DNS via Tunnel",
+      "bypass_local": "Local Traffic Bypass VPN"
+    },
+    "masking": {
+      "title": "Protocol Masking",
+      "disabled": "Off",
+      "enabled": "On",
+      "protocol": "Protocol",
+      "quic": "QUIC"
+    },
+    "connection": {
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "connecting": "Connecting...",
+      "last_handshake": "Last Handshake",
+      "traffic": "Traffic",
+      "duration": "Duration"
+    },
+    "common": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "edit": "Edit",
+      "add": "Add",
+      "close": "Close",
+      "confirm": "Confirm",
+      "error": "Error",
+      "success": "Success"
+    }
+  }
+}
