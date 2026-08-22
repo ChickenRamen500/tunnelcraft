@@ -86,6 +86,7 @@ type ServerEntry struct {
         WGConfig      *WGConfigEntry      `yaml:"wg_config,omitempty"`
         HysteriaConfig *HysteriaConfigEntry `yaml:"hysteria_config,omitempty"`
         AmneziaConfig *AmneziaConfigEntry  `yaml:"amnezia_config,omitempty"`
+        ProxyConfig   *ProxyConfigEntry    `yaml:"proxy_config,omitempty"`
 }
 
 // XrayConfigEntry holds Xray/VLESS/VMESS specific fields.
@@ -160,6 +161,66 @@ type AmneziaConfigEntry struct {
         RejectAfterTime       string `yaml:"reject_after_time"`
         KeepaliveTimeout      string `yaml:"keepalive_timeout"`
         MaxHandshakeAttempts  string `yaml:"max_handshake_attempts"`
+}
+
+// ProxyConfigEntry holds unified proxy protocol fields for VLESS/Trojan/VMESS/Hysteria2/TUIC.
+// Used with sing-box and xray sidecars.
+type ProxyConfigEntry struct {
+        Protocol          string `yaml:"protocol"`           // vless, trojan, vmess, hysteria, hysteria2, tuic, shadowsocks
+        Address           string `yaml:"address"`
+        Port              int    `yaml:"port"`
+        UUID              string `yaml:"uuid,omitempty"`     // vless/vmess/tuic
+        Password          string `yaml:"password,omitempty"` // trojan/ss/hy2/tuic
+        Network           string `yaml:"network,omitempty"`  // tcp, ws, grpc, h2, httpupgrade, kcp, xhttp, quic
+        Path              string `yaml:"path,omitempty"`
+        Host              string `yaml:"host,omitempty"`
+        GrpcServiceName   string `yaml:"grpc_service_name,omitempty"`
+        Security          string `yaml:"security,omitempty"` // none, tls, reality
+        SNI               string `yaml:"sni,omitempty"`
+        Fingerprint       string `yaml:"fingerprint,omitempty"` // chrome, firefox, curl
+        RealityPublicKey  string `yaml:"reality_public_key,omitempty"`
+        RealityShortId    string `yaml:"reality_short_id,omitempty"`
+        Flow              string `yaml:"flow,omitempty"`       // xtls-rprx-vision
+        AllowInsecure     bool   `yaml:"allow_insecure,omitempty"`
+        Obfs              string `yaml:"obfs,omitempty"`       // hysteria obfs type
+        Auth              string `yaml:"auth,omitempty"`       // hysteria auth string
+        UpMbps            int    `yaml:"up_mbps,omitempty"`
+        DownMbps          int    `yaml:"down_mbps,omitempty"`
+}
+
+// RoutingSettingsEntry holds routing / split-tunnel settings.
+type RoutingSettingsEntry struct {
+        BypassRu     bool `yaml:"bypass_ru"`
+        BlockIpv6    bool `yaml:"block_ipv6"`
+        DnsViaTunnel bool `yaml:"dns_via_tunnel"`
+        BypassLocal  bool `yaml:"bypass_local"`
+}
+
+// MaskingSettingsEntry holds protocol masking / obfuscation settings.
+type MaskingSettingsEntry struct {
+        Enabled     bool   `yaml:"enabled"`
+        Fingerprint string `yaml:"fingerprint"` // chrome, firefox, curl
+        SniDomain   string `yaml:"sni_domain"`  // cover domain
+        JunkMinMs   int    `yaml:"junk_min_ms"`
+        JunkMaxMs   int    `yaml:"junk_max_ms"`
+        IPackets    bool   `yaml:"i_packets"`
+}
+
+// DnsProviderEntry is a single DNS resolver.
+type DnsProviderEntry struct {
+        Name string `yaml:"name"`
+        Kind string `yaml:"kind"` // doh, dot, plain
+        Addr string `yaml:"addr"`
+}
+
+// DnsChainSettingsEntry holds layered DNS resolution chain.
+type DnsChainSettingsEntry struct {
+        Enabled      bool                 `yaml:"enabled"`
+        Doh          []DnsProviderEntry   `yaml:"doh"`
+        Dot          []DnsProviderEntry   `yaml:"dot"`
+        Plain        []DnsProviderEntry   `yaml:"plain"`
+        DeadlineMs   int                  `yaml:"deadline_ms"`
+        PerAttemptMs int                  `yaml:"per_attempt_ms"`
 }
 
 // SubscriptionEntry is a persisted subscription source.
