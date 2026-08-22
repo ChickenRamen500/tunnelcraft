@@ -1,0 +1,102 @@
+{
+  "translation": {
+    "app": {
+      "title": "TunnelCraft",
+      "version": "v0.1.0"
+    },
+    "nav": {
+      "dashboard": "Панель управления",
+      "servers": "Серверы",
+      "subscriptions": "Подписки",
+      "split_tunnel": "Раздельный туннель",
+      "settings": "Настройки",
+      "logs": "Журнал"
+    },
+    "servers": {
+      "title": "Серверы",
+      "search_placeholder": "Поиск серверов...",
+      "import": "Импорт",
+      "refresh": "Обновить",
+      "all": "Все",
+      "favorites": "Избранные",
+      "no_servers": "Серверы не найдены",
+      "no_servers_hint": "Добавьте подписку или сервер вручную",
+      "connect": "Подключить",
+      "disconnect": "Отключить",
+      "ping": "Пинг",
+      "country": "Страна",
+      "protocol": "Протокол",
+      "sort_by": "Сортировка",
+      "sort_ping": "По пингу",
+      "sort_name": "По имени",
+      "sort_country": "По стране",
+      "group_by_country": "Группировать по странам"
+    },
+    "settings": {
+      "title": "Настройки",
+      "emergency_reset": "Аварийный сброс",
+      "emergency_reset_desc": "Остановить все процессы, снять прокси, удалить временные файлы",
+      "emergency_reset_confirm": "Вы уверены? Это разорвёт VPN-соединение.",
+      "language": "Язык",
+      "english": "English",
+      "russian": "Русский",
+      "xray_subscriptions": "Xray-подписки",
+      "update_interval": "Интервал обновления (мин)",
+      "update_interval_desc": "0 = выключено, значения <5 округляются до 5",
+      "masking_global": "Маскировка (глобально)",
+      "auto_masking": "Подбирать параметры при неудачном подключении",
+      "masking_enabled_default": "Маскировка включена по умолчанию",
+      "fingerprint": "Отпечаток браузера",
+      "cover_domain": "Домен прикрытия SNI",
+      "junk_delay_min": "Задержка мусорных пакетов мин (мс)",
+      "junk_delay_max": "Задержка мусорных пакетов макс (мс)",
+      "i_packets": "Отправлять I-пакеты (I1–I5)",
+      "local_traffic": "Локальный трафик мимо VPN",
+      "dns_resolve": "Резолв DNS эндпоинтов",
+      "trusted_dns": "Доверенный DNS-резолвер",
+      "dns_https": "DNS через HTTPS",
+      "dns_tls": "DNS через TLS",
+      "dns_plain": "Обычный DNS",
+      "add_custom": "+ Свой",
+      "deadline_ms": "Общий дедлайн (мс)",
+      "per_attempt_ms": "На попытку (мс)",
+      "test_resolve": "Проверить резолв",
+      "test_resolve_btn": "Проверить",
+      "show_result": "Показать результат",
+      "use_existing_domain": "Взять домен из существующих конфигов"
+    },
+    "routing": {
+      "title": "Маршрутизация",
+      "bypass_ru": "RU мимо VPN",
+      "block_ipv6": "Блокировать IPv6",
+      "dns_via_tunnel": "DNS через туннель",
+      "bypass_local": "Локальный трафик мимо VPN"
+    },
+    "masking": {
+      "title": "Маскировка протокола",
+      "disabled": "Выкл",
+      "enabled": "Вкл",
+      "protocol": "Протокол",
+      "quic": "QUIC"
+    },
+    "connection": {
+      "connected": "В сети",
+      "disconnected": "Не в сети",
+      "connecting": "Подключение...",
+      "last_handshake": "Последнее рукопожатие",
+      "traffic": "Передача",
+      "duration": "Длительность"
+    },
+    "common": {
+      "save": "Сохранить",
+      "cancel": "Отмена",
+      "delete": "Удалить",
+      "edit": "Редактировать",
+      "add": "Добавить",
+      "close": "Закрыть",
+      "confirm": "Подтвердить",
+      "error": "Ошибка",
+      "success": "Успешно"
+    }
+  }
+}

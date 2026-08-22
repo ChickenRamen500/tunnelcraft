@@ -185,3 +185,60 @@ npm run tauri build
 ## Лицензия
 
 MIT
+
+## VLESS/Trojan/Hysteria2: как это работает
+
+### Архитектура поддержки протоколов
+
+TunnelCraft использует sidecar-бинарники для поддержки современных протоколов:
+
+1. **sing-box.exe** (основное ядро)
+   - Поддерживает: VLESS, Trojan, VMess, Hysteria, Hysteria2, Tuic, Shadowsocks
+   - Транспорт: TCP, WS, gRPC, H2, HTTPUpgrade
+   - Безопасность: TLS, REALITY
+   - **TUN inbound**: создаёт виртуальный сетевой адаптер для полного туннелирования
+   - Маршрутизация: обход RU/локальных сетей, блокировка IPv6, DNS через туннель
+
+2. **xray-core.exe** (для KCP/XHTTP)
+   - Запускается только если у сервера `transport = kcp` или `xhttp`
+   - Слушает mixed inbound на `127.0.0.1:10810`
+   - sing-box работает в режиме моста: TUN → SOCKS5 → xray
+
+### Импорт ссылок
+
+Поддерживаются форматы:
+- `vless://UUID@host:port?type=ws&security=reality&sni=S&fp=chrome&pbk=K&sid=ID&flow=xtls-rprx-vision#Name`
+- `trojan://password@host:port?security=tls&sni=S&type=grpc&serviceName=G#Name`
+- `hysteria2://` или `hy2://password@host:port?sni=S&obfs=salamander&obfs-password=O#Name`
+- `vmess://BASE64(JSON)`
+- `ss://BASE64(method:pass)@host:port#Name`
+
+### Режимы работы
+
+- **TUN Mode**: полный захват трафика через виртуальный адаптер
+- **Proxy Mode**: локальный SOCKS5/HTTP прокси
+- **Bridge Mode**: TUN + перенаправление в xray (для KCP/XHTTP)
+
+### Пинг и сортировка
+
+- **TCP Ping**: измеряет время подключения к серверу (3 попытки)
+- **Real Delay Test**: запускает временный sing-box и делает HTTP-запрос через туннель
+- Сортировка: по пингу, имени, стране
+- Группировка: по странам (флаги извлекаются из названия сервера)
+
+### DNS Chain
+
+Для резолва эндпоинтов используется цепочка DNS:
+1. DoH (DNS over HTTPS) — Cloudflare, Google, Quad9
+2. DoT (DNS over TLS) — те же провайдеры на порту 853
+3. Plain DNS — обычный UDP на порту 53
+
+Первый успешный ответ побеждает. Настраиваемые таймауты на попытку и общий дедлайн.
+
+### Маскировка
+
+Глобальные настройки маскировки:
+- Отпечаток браузера (Chrome/Firefox/Curl)
+- Домен прикрытия SNI
+- Задержки мусорных пакетов (Jc, Jmin, Jmax)
+- I-пакеты (I1–I5) для AmneziaWG
