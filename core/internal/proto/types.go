@@ -15,15 +15,17 @@ import (
 type Protocol int32
 
 const (
-        Protocol_PROTOCOL_UNSPECIFIED Protocol = 0
-        Protocol_PROTOCOL_VLESS        Protocol = 1
-        Protocol_PROTOCOL_VMESS        Protocol = 2
-        Protocol_PROTOCOL_TROJAN       Protocol = 3
-        Protocol_PROTOCOL_SHADOWSOCKS  Protocol = 4
-        Protocol_PROTOCOL_WIREGUARD    Protocol = 5
-        Protocol_PROTOCOL_HYSTERIA     Protocol = 6
-        Protocol_PROTOCOL_AMNEZIAWG    Protocol = 7
-        Protocol_PROTOCOL_SSH          Protocol = 8
+        Protocol_PROTOCOL_UNSPECIFIED   Protocol = 0
+        Protocol_PROTOCOL_VLESS         Protocol = 1
+        Protocol_PROTOCOL_VMESS         Protocol = 2
+        Protocol_PROTOCOL_TROJAN        Protocol = 3
+        Protocol_PROTOCOL_SHADOWSOCKS   Protocol = 4
+        Protocol_PROTOCOL_WIREGUARD     Protocol = 5
+        Protocol_PROTOCOL_HYSTERIA      Protocol = 6
+        Protocol_PROTOCOL_AMNEZIAWG     Protocol = 7
+        Protocol_PROTOCOL_SSH           Protocol = 8
+        Protocol_PROTOCOL_HYSTERIA2     Protocol = 9
+        Protocol_PROTOCOL_TUIC          Protocol = 10
 )
 
 type Transport int32
