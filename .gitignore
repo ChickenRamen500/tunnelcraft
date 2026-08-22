@@ -38,3 +38,11 @@ target/
 bin/.gitkeep
 TunnelCraft-Build-Release.bat
 TunnelCraft.bat
+/ui/node_modules/.bin
+/ui/node_modules/.vite
+/ui/node_modules/@babel
+/ui/node_modules/@esbuild
+/ui/node_modules
+start.bat
+start2.bat
+package-lock.json
