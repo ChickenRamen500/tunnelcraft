@@ -201,6 +201,76 @@ type ShadowsocksConfig struct {
 
 func (*ShadowsocksConfig) ProtoMessage()               {}
 
+// ProxyConfig holds unified proxy protocol fields for VLESS/Trojan/VMESS/Hysteria2/TUIC.
+// Used with sing-box and xray sidecars.
+type ProxyConfig struct {
+	Protocol          Protocol `protobuf:"varint,1,opt,name=protocol,proto3,enum=tunnelcraft.v1.Protocol" json:"protocol,omitempty"`
+	Address           string   `protobuf:"bytes,2,opt,name=address,proto3" json:"address,omitempty"`
+	Port              int32    `protobuf:"varint,3,opt,name=port,proto3" json:"port,omitempty"`
+	Uuid              string   `protobuf:"bytes,4,opt,name=uuid,proto3" json:"uuid,omitempty"`
+	Password          string   `protobuf:"bytes,5,opt,name=password,proto3" json:"password,omitempty"`
+	Network           string   `protobuf:"bytes,6,opt,name=network,proto3" json:"network,omitempty"`
+	Path              string   `protobuf:"bytes,7,opt,name=path,proto3" json:"path,omitempty"`
+	Host              string   `protobuf:"bytes,8,opt,name=host,proto3" json:"host,omitempty"`
+	GrpcServiceName   string   `protobuf:"bytes,9,opt,name=grpc_service_name,json=grpcServiceName,proto3" json:"grpc_service_name,omitempty"`
+	Security          string   `protobuf:"bytes,10,opt,name=security,proto3" json:"security,omitempty"`
+	Sni               string   `protobuf:"bytes,11,opt,name=sni,proto3" json:"sni,omitempty"`
+	Fingerprint       string   `protobuf:"bytes,12,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	RealityPublicKey  string   `protobuf:"bytes,13,opt,name=reality_public_key,json=realityPublicKey,proto3" json:"reality_public_key,omitempty"`
+	RealityShortId    string   `protobuf:"bytes,14,opt,name=reality_short_id,json=realityShortId,proto3" json:"reality_short_id,omitempty"`
+	Flow              string   `protobuf:"bytes,15,opt,name=flow,proto3" json:"flow,omitempty"`
+	AllowInsecure     bool     `protobuf:"varint,16,opt,name=allow_insecure,json=allowInsecure,proto3" json:"allow_insecure,omitempty"`
+	Obfs              string   `protobuf:"bytes,17,opt,name=obfs,proto3" json:"obfs,omitempty"`
+	Auth              string   `protobuf:"bytes,18,opt,name=auth,proto3" json:"auth,omitempty"`
+	UpMbps            int32    `protobuf:"varint,19,opt,name=up_mbps,json=upMbps,proto3" json:"up_mbps,omitempty"`
+	DownMbps          int32    `protobuf:"varint,20,opt,name=down_mbps,json=downMbps,proto3" json:"down_mbps,omitempty"`
+}
+
+func (*ProxyConfig) ProtoMessage()               {}
+
+// RoutingSettings holds routing / split-tunnel settings.
+type RoutingSettings struct {
+	BypassRu      bool `protobuf:"varint,1,opt,name=bypass_ru,json=bypassRu,proto3" json:"bypass_ru,omitempty"`
+	BlockIpv6     bool `protobuf:"varint,2,opt,name=block_ipv6,json=blockIpv6,proto3" json:"block_ipv6,omitempty"`
+	DnsViaTunnel  bool `protobuf:"varint,3,opt,name=dns_via_tunnel,json=dnsViaTunnel,proto3" json:"dns_via_tunnel,omitempty"`
+	BypassLocal   bool `protobuf:"varint,4,opt,name=bypass_local,json=bypassLocal,proto3" json:"bypass_local,omitempty"`
+}
+
+func (*RoutingSettings) ProtoMessage()               {}
+
+// MaskingSettings holds protocol masking / obfuscation settings.
+type MaskingSettings struct {
+	Enabled      bool   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	Fingerprint  string `protobuf:"bytes,2,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	SniDomain    string `protobuf:"bytes,3,opt,name=sni_domain,json=sniDomain,proto3" json:"sni_domain,omitempty"`
+	JunkMinMs    int32  `protobuf:"varint,4,opt,name=junk_min_ms,json=junkMinMs,proto3" json:"junk_min_ms,omitempty"`
+	JunkMaxMs    int32  `protobuf:"varint,5,opt,name=junk_max_ms,json=junkMaxMs,proto3" json:"junk_max_ms,omitempty"`
+	IPackets     bool   `protobuf:"varint,6,opt,name=i_packets,json=iPackets,proto3" json:"i_packets,omitempty"`
+}
+
+func (*MaskingSettings) ProtoMessage()               {}
+
+// DnsProvider is a single DNS resolver.
+type DnsProvider struct {
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Kind string `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"` // doh | dot | plain
+	Addr string `protobuf:"bytes,3,opt,name=addr,proto3" json:"addr,omitempty"`
+}
+
+func (*DnsProvider) ProtoMessage()               {}
+
+// DnsChainSettings holds layered DNS resolution chain.
+type DnsChainSettings struct {
+	Enabled       bool         `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	Doh           []*DnsProvider `protobuf:"bytes,2,rep,name=doh,proto3" json:"doh,omitempty"`
+	Dot           []*DnsProvider `protobuf:"bytes,3,rep,name=dot,proto3" json:"dot,omitempty"`
+	Plain         []*DnsProvider `protobuf:"bytes,4,rep,name=plain,proto3" json:"plain,omitempty"`
+	DeadlineMs    int32        `protobuf:"varint,5,opt,name=deadline_ms,json=deadlineMs,proto3" json:"deadline_ms,omitempty"`
+	PerAttemptMs  int32        `protobuf:"varint,6,opt,name=per_attempt_ms,json=perAttemptMs,proto3" json:"per_attempt_ms,omitempty"`
+}
+
+func (*DnsChainSettings) ProtoMessage()               {}
+
 // AmneziaWGConfig holds all AmneziaWG connection parameters.
 // This supports both AWG2 (legacy uint32 junk params) and AWG3 (string-based
 // H1-H4 ranges, header protection key, content padding, timing fields).
@@ -272,6 +342,7 @@ type Server struct {
         Shadowsocks    *ShadowsocksConfig `protobuf:"bytes,13,opt,name=shadowsocks,proto3" json:"shadowsocks,omitempty"`
         Amneziawg      *AmneziaWGConfig `protobuf:"bytes,14,opt,name=amneziawg,proto3" json:"amneziawg,omitempty"`
         Ssh            *SSHConfig       `protobuf:"bytes,15,opt,name=ssh,proto3" json:"ssh,omitempty"`
+        Proxy          *ProxyConfig     `protobuf:"bytes,30,opt,name=proxy,proto3" json:"proxy,omitempty"`
         Geo            *GeoLocation     `protobuf:"bytes,20,opt,name=geo,proto3" json:"geo,omitempty"`
         Status         ServerStatus     `protobuf:"varint,21,opt,name=status,proto3,enum=tunnelcraft.v1.ServerStatus" json:"status,omitempty"`
         Favorite       bool             `protobuf:"varint,22,opt,name=favorite,proto3" json:"favorite,omitempty"`
@@ -357,6 +428,11 @@ type Settings struct {
         Theme              string          `protobuf:"bytes,18,opt,name=theme,proto3" json:"theme,omitempty"`
         ActiveServerId     string          `protobuf:"bytes,19,opt,name=active_server_id,json=activeServerId,proto3" json:"active_server_id,omitempty"`
         Routing            *RoutingConfig  `protobuf:"bytes,20,opt,name=routing,proto3" json:"routing,omitempty"`
+        // New fields for proxy protocols support
+        RoutingSettings    *RoutingSettings   `protobuf:"bytes,21,opt,name=routing_settings,json=routingSettings,proto3" json:"routing_settings,omitempty"`
+        Masking            *MaskingSettings   `protobuf:"bytes,22,opt,name=masking,proto3" json:"masking,omitempty"`
+        DnsChain           *DnsChainSettings  `protobuf:"bytes,23,opt,name=dns_chain,json=dnsChain,proto3" json:"dns_chain,omitempty"`
+        SubUpdateIntervalMin int32            `protobuf:"varint,24,opt,name=sub_update_interval_min,json=subUpdateIntervalMin,proto3" json:"sub_update_interval_min,omitempty"`
 }
 
 func (*Settings) ProtoMessage()               {}
