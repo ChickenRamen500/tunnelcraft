@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/ChickenRamen500/tunnelcraft/core/internal/engine"
+	protos "github.com/ChickenRamen500/tunnelcraft/core/internal/proto"
 )
 
 // SingBoxHandler manages the sing-box.exe subprocess.
@@ -26,11 +27,16 @@ func NewSingBoxHandler(binPath string) *SingBoxHandler {
 
 // Start generates a sing-box JSON config from the server config and launches sing-box.exe.
 func (s *SingBoxHandler) Start(ctx context.Context, server *engine.ServerConfig, tunMode bool, localProxyPort uint32) error {
+	return s.StartWithSettings(ctx, server, tunMode, localProxyPort, nil)
+}
+
+// StartWithSettings generates a sing-box JSON config with user settings and launches sing-box.exe.
+func (s *SingBoxHandler) StartWithSettings(ctx context.Context, server *engine.ServerConfig, tunMode bool, localProxyPort uint32, settings *protos.Settings) error {
 	if s.IsRunning() {
 		return fmt.Errorf("sing-box: already running")
 	}
 
-	cfgPath, err := s.generateConfig(server, tunMode, localProxyPort)
+	cfgPath, err := s.generateConfig(server, tunMode, localProxyPort, settings)
 	if err != nil {
 		return fmt.Errorf("sing-box: failed to generate config: %w", err)
 	}
@@ -47,17 +53,17 @@ func (s *SingBoxHandler) Start(ctx context.Context, server *engine.ServerConfig,
 }
 
 // generateConfig creates a sing-box JSON config file.
-func (s *SingBoxHandler) generateConfig(server *engine.ServerConfig, tunMode bool, localProxyPort uint32) (string, error) {
+func (s *SingBoxHandler) generateConfig(server *engine.ServerConfig, tunMode bool, localProxyPort uint32, settings *protos.Settings) (string, error) {
 	cfg := map[string]interface{}{
 		"log": map[string]interface{}{
 			"level":      "info",
 			"timestamp":  true,
 			"output":     "",
 		},
-		"dns": s.buildDNS(),
-		"inbounds": s.buildInbounds(tunMode, localProxyPort),
+		"dns":       s.buildDNS(settings),
+		"inbounds":  s.buildInbounds(tunMode, localProxyPort),
 		"outbounds": s.buildOutbounds(server),
-		"route":     s.buildRoute(),
+		"route":     s.buildRoute(settings),
 	}
 
 	data, err := json.MarshalIndent(cfg, "", "  ")
@@ -175,7 +181,7 @@ func (s *SingBoxHandler) buildTrojan(server *engine.ServerConfig) map[string]int
 		"tag":          "proxy-main",
 		"server":       server.Host,
 		"server_port":  server.Port,
-		"password":     server.HysteriaAuth,
+		"password":     server.TrojanPassword,
 	}
 
 	if server.Security == "tls" || server.Security == "reality" {
@@ -346,24 +352,51 @@ func (s *SingBoxHandler) buildTransport(server *engine.ServerConfig) map[string]
 }
 
 // buildDNS creates DNS configuration.
-func (s *SingBoxHandler) buildDNS() map[string]interface{} {
-	return map[string]interface{}{
-		"servers": []map[string]interface{}{
-			{
-				"tag":      "dns-remote",
-				"address":  "https://1.1.1.1/dns-query",
-				"address_resolver": "dns-local",
-			},
-			{
-				"tag":     "dns-local",
-				"address": "local",
-				"detour":  "direct",
-			},
-			{
-				"tag":     "dns-block",
-				"address": "rcode://success",
-			},
+func (s *SingBoxHandler) buildDNS(settings *protos.Settings) map[string]interface{} {
+	dnsServers := []map[string]interface{}{
+		{
+			"tag":      "dns-remote",
+			"address":  "https://1.1.1.1/dns-query",
+			"address_resolver": "dns-local",
 		},
+		{
+			"tag":     "dns-local",
+			"address": "local",
+			"detour":  "direct",
+		},
+		{
+			"tag":     "dns-block",
+			"address": "rcode://success",
+		},
+	}
+
+	// If dns_chain is enabled, add configured providers
+	if settings != nil && settings.DnsChain.Enabled {
+		for _, p := range settings.DnsChain.Doh {
+			dnsServers = append(dnsServers, map[string]interface{}{
+				"tag":     p.Name,
+				"address": p.Addr,
+				"detour":  "proxy-main",
+			})
+		}
+		for _, p := range settings.DnsChain.Dot {
+			dnsServers = append(dnsServers, map[string]interface{}{
+				"tag":     p.Name,
+				"address": p.Addr,
+				"detour":  "proxy-main",
+			})
+		}
+		for _, p := range settings.DnsChain.Plain {
+			dnsServers = append(dnsServers, map[string]interface{}{
+				"tag":     p.Name,
+				"address": p.Addr,
+				"detour":  "direct",
+			})
+		}
+	}
+
+	return map[string]interface{}{
+		"servers": dnsServers,
 		"rules": []map[string]interface{}{
 			{
 				"outbound": "any",
@@ -374,19 +407,50 @@ func (s *SingBoxHandler) buildDNS() map[string]interface{} {
 }
 
 // buildRoute creates routing rules.
-func (s *SingBoxHandler) buildRoute() map[string]interface{} {
-	return map[string]interface{}{
-		"rules": []map[string]interface{}{
-			{
-				"ip_is_private": true,
-				"outbound":      "direct",
-			},
-			{
-				"outbound": "proxy-main",
-			},
+func (s *SingBoxHandler) buildRoute(settings *protos.Settings) map[string]interface{} {
+	rules := []map[string]interface{}{
+		{
+			"ip_is_private": true,
+			"outbound":      "direct",
 		},
+	}
+
+	// Add geoip-ru rule if bypass_ru is enabled
+	if settings != nil && settings.Routing.BypassRu {
+		rules = append(rules, map[string]interface{}{
+			"rule_set": "geoip-ru",
+			"outbound": "direct",
+		})
+		rules = append(rules, map[string]interface{}{
+			"domain_suffix": []string{".ru", ".рф"},
+			"outbound":      "direct",
+		})
+	}
+
+	// Final rule: everything else goes through proxy
+	rules = append(rules, map[string]interface{}{
+		"outbound": "proxy-main",
+	})
+
+	routeCfg := map[string]interface{}{
+		"rules":                 rules,
 		"auto_detect_interface": true,
 	}
+
+	// Add rule_set for geoip-ru if bypass_ru is enabled
+	if settings != nil && settings.Routing.BypassRu {
+		routeCfg["rule_set"] = []map[string]interface{}{
+			{
+				"type":              "remote",
+				"tag":               "geoip-ru",
+				"format":            "binary",
+				"url":               "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-ru.srs",
+				"download_detour":   "direct",
+			},
+		}
+	}
+
+	return routeCfg
 }
 
 func stringsSplit(s, sep string) []string {

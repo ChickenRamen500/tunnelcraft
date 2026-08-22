@@ -178,6 +178,7 @@ func Parse(rawContent []byte) ([]engine.ServerConfig, []ParseError) {
 
 // parseShareLink routes a single line to the appropriate protocol parser.
 func parseShareLink(line string) (engine.ServerConfig, error) {
+        line = strings.TrimSpace(line)
         switch {
         case strings.HasPrefix(line, "vless://"):
                 return parseVLESS(line)
@@ -394,7 +395,7 @@ func parseTrojan(raw string) (engine.ServerConfig, error) {
         }
         cfg.Host = host
         cfg.Port = port
-        cfg.HysteriaAuth = password // reuse HysteriaAuth field for password
+        cfg.TrojanPassword = password
 
         // Transport.
         cfg.Transport = query.Get("type")

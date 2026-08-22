@@ -84,6 +84,8 @@ type ServerConfig struct {
         WSPath      string
         GRPCService string
         AllowInsecure bool
+        // Trojan-specific
+        TrojanPassword string
         // WireGuard-specific
         WGPrivateKey        string
         WGPublicKey         string
