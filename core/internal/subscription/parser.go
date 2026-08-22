@@ -183,6 +183,10 @@ func parseShareLink(line string) (engine.ServerConfig, error) {
                 return parseVLESS(line)
         case strings.HasPrefix(line, "vmess://"):
                 return parseVMESS(line)
+        case strings.HasPrefix(line, "trojan://"):
+                return parseTrojan(line)
+        case strings.HasPrefix(line, "ss://"):
+                return parseShadowsocks(line)
         case strings.HasPrefix(line, "hysteria2://") || strings.HasPrefix(line, "hy2://"):
                 return parseHysteria2(line)
         case strings.HasPrefix(line, "wg://"):
@@ -354,6 +358,113 @@ func parseVMESS(raw string) (engine.ServerConfig, error) {
         // Cipher is informational only (mapped to a field we don't have, skip).
         _ = v.Scy
         _ = v.Aid
+
+        return cfg, nil
+}
+
+// ---------------------------------------------------------------------------
+// Trojan parser
+// ---------------------------------------------------------------------------
+
+// parseTrojan handles the URI form:
+//
+//      trojan://password@host:port?security=tls&sni=S&type=grpc&serviceName=G#Name
+func parseTrojan(raw string) (engine.ServerConfig, error) {
+        var cfg engine.ServerConfig
+        cfg.ID = uuid.New().String()
+        cfg.Protocol = "trojan"
+
+        body, err := trimScheme(raw, "trojan://")
+        if err != nil {
+                return cfg, err
+        }
+
+        body, frag := splitFragment(body)
+        cfg.Name = frag
+
+        body, queryStr := splitQuery(body)
+        query, err := url.ParseQuery(queryStr)
+        if err != nil {
+                return cfg, fmt.Errorf("invalid query string: %w", err)
+        }
+
+        host, port, password, err := parseUserHostPort(body)
+        if err != nil {
+                return cfg, err
+        }
+        cfg.Host = host
+        cfg.Port = port
+        cfg.HysteriaAuth = password // reuse HysteriaAuth field for password
+
+        // Transport.
+        cfg.Transport = query.Get("type")
+        cfg.WSPath = query.Get("path")
+        cfg.GRPCService = query.Get("serviceName")
+        cfg.KCPSeed = query.Get("seed")
+
+        // Security.
+        cfg.Security = query.Get("security")
+        cfg.SNI = query.Get("sni")
+        cfg.Fingerprint = query.Get("fp")
+        cfg.ALPN = query.Get("alpn")
+        cfg.AllowInsecure = query.Get("allowInsecure") == "1"
+
+        return cfg, nil
+}
+
+// ---------------------------------------------------------------------------
+// Shadowsocks parser
+// ---------------------------------------------------------------------------
+
+// parseShadowsocks handles ss:// URIs:
+//
+//      ss://BASE64(method:pass)@host:port#Name  OR  ss://method:pass@host:port#Name
+func parseShadowsocks(raw string) (engine.ServerConfig, error) {
+        var cfg engine.ServerConfig
+        cfg.ID = uuid.New().String()
+        cfg.Protocol = "shadowsocks"
+
+        body, err := trimScheme(raw, "ss://")
+        if err != nil {
+                return cfg, err
+        }
+
+        body, frag := splitFragment(body)
+        cfg.Name = frag
+
+        // Try base64 decode of userinfo part first (legacy format).
+        var decodedBody string
+        if idx := strings.Index(body, "@"); idx >= 0 {
+                userinfo := body[:idx]
+                rest := body[idx+1:]
+                decoded, err := base64DecodeAny(userinfo)
+                if err == nil {
+                        decodedBody = string(decoded) + "@" + rest
+                } else {
+                        decodedBody = body
+                }
+        } else {
+                decodedBody = body
+        }
+
+        // Parse method:pass@host:port.
+        if idx := strings.Index(decodedBody, "@"); idx >= 0 {
+                methodPass := decodedBody[:idx]
+                hostPort := decodedBody[idx+1:]
+
+                // method:pass
+                if mpIdx := strings.Index(methodPass, ":"); mpIdx >= 0 {
+                        // cfg.Method = methodPass[:mpIdx] // not stored currently
+                        cfg.HysteriaAuth = methodPass[mpIdx+1:] // password
+                }
+
+                h, p, err := netSplitHostPort(hostPort)
+                if err != nil {
+                        return cfg, fmt.Errorf("invalid host:port: %w", err)
+                }
+                cfg.Host = h
+                cfg.Port = p
+        }
 
         return cfg, nil
 }
@@ -1563,6 +1674,8 @@ func hasShareLinkPrefix(s string) bool {
                 switch {
                 case strings.HasPrefix(line, "vless://"),
                         strings.HasPrefix(line, "vmess://"),
+                        strings.HasPrefix(line, "trojan://"),
+                        strings.HasPrefix(line, "ss://"),
                         strings.HasPrefix(line, "hysteria2://"),
                         strings.HasPrefix(line, "hy2://"),
                         strings.HasPrefix(line, "wg://"),
