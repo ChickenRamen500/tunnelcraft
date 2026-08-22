@@ -35,3 +35,6 @@ dist/
 build/
 target/
 ```
+bin/.gitkeep
+TunnelCraft-Build-Release.bat
+TunnelCraft.bat
