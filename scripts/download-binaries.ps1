@@ -6,13 +6,45 @@ $ErrorActionPreference = "Continue"  # don't abort on first error
 $BinDir = Join-Path $PSScriptRoot "..\bin"
 if (-not (Test-Path $BinDir)) { New-Item -ItemType Directory -Path $BinDir -Force | Out-Null }
 
+# Version variables
+$SingBoxVersion = "1.11.10"
+$XrayVersion = "latest"
+$HysteriaVersion = "latest"
+$WintunVersion = "0.14.1"
+
 Write-Host "=== TunnelCraft Binary Downloader ===" -ForegroundColor Cyan
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 1. xray-core.exe  — GitHub releases (WORKS)
+# 1. sing-box.exe — GitHub releases (SagerNet/sing-box)
 # ------------------------------------------------------------------
-Write-Host "[1/5] xray-core.exe" -ForegroundColor Yellow
+Write-Host "[1/7] sing-box.exe" -ForegroundColor Yellow
+try {
+    $url = "https://github.com/SagerNet/sing-box/releases/download/v${SingBoxVersion}/sing-box-${SingBoxVersion}-windows-amd64.zip"
+    $tmp = Join-Path $env:TEMP "tunnelcraft-singbox.zip"
+    Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing
+    $ext = Join-Path $env:TEMP "tunnelcraft-singbox"
+    if (Test-Path $ext) { Remove-Item -Recurse -Force $ext }
+    Expand-Archive -Path $tmp -DestinationPath $ext -Force
+    $exe = Get-ChildItem -Path $ext -Filter "sing-box.exe" -Recurse | Select-Object -First 1
+    if ($exe) {
+        Copy-Item $exe.FullName (Join-Path $BinDir "sing-box.exe") -Force
+        $sz = [math]::Round((Get-Item (Join-Path $BinDir "sing-box.exe")).Length / 1MB, 2)
+        Write-Host "  [OK] sing-box.exe v${SingBoxVersion} ($sz MB)" -ForegroundColor Green
+    } else {
+        Write-Host "  [WARN] sing-box.exe not found inside zip" -ForegroundColor Red
+    }
+    Remove-Item -Recurse -Force $ext
+    Remove-Item -Force $tmp
+} catch {
+    Write-Host "  [FAIL] $($_.Exception.Message)" -ForegroundColor Red
+}
+Write-Host ""
+
+# ------------------------------------------------------------------
+# 2. xray-core.exe  — GitHub releases (WORKS)
+# ------------------------------------------------------------------
+Write-Host "[2/7] xray-core.exe" -ForegroundColor Yellow
 try {
     $tmp = Join-Path $env:TEMP "tunnelcraft-xray.zip"
     Invoke-WebRequest -Uri "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-windows-64.zip" -OutFile $tmp -UseBasicParsing
@@ -35,9 +67,9 @@ try {
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 2. hysteria.exe  — GitHub releases (standalone exe, not zip)
+# 3. hysteria.exe  — GitHub releases (standalone exe, not zip)
 # ------------------------------------------------------------------
-Write-Host "[2/5] hysteria.exe" -ForegroundColor Yellow
+Write-Host "[3/7] hysteria.exe" -ForegroundColor Yellow
 try {
     Invoke-WebRequest -Uri "https://github.com/apernet/hysteria/releases/latest/download/hysteria-windows-amd64.exe" -OutFile (Join-Path $BinDir "hysteria.exe") -UseBasicParsing
     $sz = [math]::Round((Get-Item (Join-Path $BinDir "hysteria.exe")).Length / 1MB, 2)
@@ -48,9 +80,9 @@ try {
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 3. wintun.dll  — wintun.net (WORKS)
+# 4. wintun.dll  — wintun.net (WORKS)
 # ------------------------------------------------------------------
-Write-Host "[3/5] wintun.dll" -ForegroundColor Yellow
+Write-Host "[4/7] wintun.dll" -ForegroundColor Yellow
 try {
     $tmp = Join-Path $env:TEMP "tunnelcraft-wintun.zip"
     Invoke-WebRequest -Uri "https://www.wintun.net/builds/wintun-0.14.1.zip" -OutFile $tmp -UseBasicParsing
@@ -73,9 +105,9 @@ try {
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 2.5. wireguard.exe  — copy from system WireGuard installation
+# 5. wireguard.exe  — copy from system WireGuard installation
 # ------------------------------------------------------------------
-Write-Host "[2.5/5] wireguard.exe" -ForegroundColor Yellow
+Write-Host "[5/7] wireguard.exe" -ForegroundColor Yellow
 $wgExeSystem = @(
     "C:\Program Files\WireGuard\wireguard.exe",
     "C:\Program Files (x86)\WireGuard\wireguard.exe"
@@ -99,11 +131,11 @@ if (-not $wgCopied) {
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 4. wireguard-go.exe  — extracted from WireGuard for Windows installer
+# 6. wireguard-go.exe  — extracted from WireGuard for Windows installer
 #    The WireGuard repo has NO releases. We download the official MSI
 #    and extract wireguard-go.exe from it.
 # ------------------------------------------------------------------
-Write-Host "[4/5] wireguard-go.exe" -ForegroundColor Yellow
+Write-Host "[6/7] wireguard-go.exe" -ForegroundColor Yellow
 $wgExe = Join-Path $BinDir "wireguard-go.exe"
 
 # Check if already installed on system
@@ -193,7 +225,7 @@ Write-Host ""
 #    Clone and build from amnezia-vpn/amneziawg-go repository
 #    main.go and main_windows.go are at the ROOT of the repo
 # ------------------------------------------------------------------
-Write-Host "[5/5] amneziawg-go.exe" -ForegroundColor Yellow
+Write-Host "[6/6] amneziawg-go.exe" -ForegroundColor Yellow
 $awgExe = Join-Path $BinDir "amneziawg-go.exe"
 $awgFound = $false
 
@@ -310,7 +342,7 @@ Write-Host ""
 # Summary
 # ------------------------------------------------------------------
 Write-Host "=== Summary ===" -ForegroundColor Cyan
-$required = @("xray-core.exe", "hysteria.exe", "wintun.dll", "wireguard.exe", "amneziawg-go.exe")
+$required = @("sing-box.exe", "xray-core.exe", "hysteria.exe", "wintun.dll", "wireguard.exe", "amneziawg-go.exe")
 $ok = 0
 $fail = 0
 foreach ($f in $required) {
