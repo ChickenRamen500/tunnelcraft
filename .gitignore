@@ -1,4 +1,26 @@
-```go
-// No build artifacts, dependencies, or temporary files detected in changes
-// Only source code files (.go) were modified
-```
+# Зависимости Node.js
+ui/node_modules/
+ui/dist/
+ui/build/
+
+# Бинарные файлы и сборки Go
+core/bin/
+bin/
+*.exe
+*.dll
+*.dylib
+*.so
+
+# Временные файлы и IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Конфиги данных (если они генерируются рантаймом)
+core/data/*.json
+/ui/src-tauri/target/debug
+bin/tunnelcraftd.exe
+cleanup-pr.ps1
+patch-all.ps1
