@@ -11,12 +11,10 @@ echo   TunnelCraft - Dev Mode (Build + Run, No Git Pull)
 echo ============================================================
 echo.
 
-:: ===== Set working directory =====
 cd /d "%~dp0"
 echo [INFO] Working directory: %CD%
 echo.
 
-:: ===== Check Go =====
 where go >nul 2>&1
 if %ERRORLEVEL% neq 0 (
     color 0C
@@ -24,7 +22,6 @@ if %ERRORLEVEL% neq 0 (
     goto :fail
 )
 
-:: ===== Check Node.js =====
 where node >nul 2>&1
 if %ERRORLEVEL% neq 0 (
     color 0C
@@ -32,7 +29,6 @@ if %ERRORLEVEL% neq 0 (
     goto :fail
 )
 
-:: ===== Check Rust/Cargo =====
 where cargo >nul 2>&1
 if %ERRORLEVEL% neq 0 (
     color 0C
@@ -40,20 +36,15 @@ if %ERRORLEVEL% neq 0 (
     goto :fail
 )
 
-for /f "tokens=3" %%i in ('go version 2^>^&1') do echo [OK] Go: %%i
-for /f "tokens=*" %%i in ('node --version 2^>^&1') do echo [OK] Node: %%i
-for /f "tokens=*" %%i in ('cargo --version 2^>^&1') do echo [OK] %%i
+echo [OK] All tools found.
 echo.
 
-:: ==========================================================
-:: STEP 1: Check external binaries
-:: ==========================================================
 if not exist "bin\xray-core.exe" (
     echo [1/4] Downloading external binaries (first run)...
     if exist "scripts\download-binaries.ps1" (
         powershell -ExecutionPolicy Bypass -File scripts\download-binaries.ps1
         if %ERRORLEVEL% neq 0 (
-            echo [WARN] Some binaries failed to download. Core features may be limited.
+            echo [WARN] Some binaries failed to download.
         )
     ) else (
         echo [WARN] scripts\download-binaries.ps1 not found. Skipping.
@@ -63,9 +54,6 @@ if not exist "bin\xray-core.exe" (
 )
 echo.
 
-:: ==========================================================
-:: STEP 2: Build Go daemon (tunnelcraftd.exe)
-:: ==========================================================
 echo [2/4] Building Go daemon (tunnelcraftd.exe)...
 pushd core\cmd\tunnelcraftd
 go build -o ..\..\..\bin\tunnelcraftd.exe .
@@ -79,9 +67,6 @@ popd
 echo [OK] tunnelcraftd.exe built successfully.
 echo.
 
-:: ==========================================================
-:: STEP 3: Install npm dependencies (if needed)
-:: ==========================================================
 if not exist "ui\node_modules" (
     echo [3/4] Installing npm dependencies (may take 2-5 min on first run)...
     pushd ui
@@ -99,9 +84,6 @@ if not exist "ui\node_modules" (
 )
 echo.
 
-:: ==========================================================
-:: STEP 4: Launch Tauri dev mode
-:: ==========================================================
 echo [4/4] Launching TunnelCraft (Tauri dev mode)...
 echo.
 echo ============================================================

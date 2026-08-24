@@ -11,12 +11,10 @@ echo   TunnelCraft - Dev Mode (Pull from GitHub + Build + Run)
 echo ============================================================
 echo.
 
-:: ===== Set working directory =====
 cd /d "%~dp0"
 echo [INFO] Working directory: %CD%
 echo.
 
-:: ===== Check Git =====
 where git >nul 2>&1
 if %ERRORLEVEL% neq 0 (
     color 0C
@@ -24,7 +22,6 @@ if %ERRORLEVEL% neq 0 (
     goto :fail
 )
 
-:: ===== Check Go =====
 where go >nul 2>&1
 if %ERRORLEVEL% neq 0 (
     color 0C
@@ -32,7 +29,6 @@ if %ERRORLEVEL% neq 0 (
     goto :fail
 )
 
-:: ===== Check Node.js =====
 where node >nul 2>&1
 if %ERRORLEVEL% neq 0 (
     color 0C
@@ -40,7 +36,6 @@ if %ERRORLEVEL% neq 0 (
     goto :fail
 )
 
-:: ===== Check Rust/Cargo =====
 where cargo >nul 2>&1
 if %ERRORLEVEL% neq 0 (
     color 0C
@@ -48,32 +43,11 @@ if %ERRORLEVEL% neq 0 (
     goto :fail
 )
 
-for /f "tokens=3" %%i in ('go version 2^>^&1') do echo [OK] Go: %%i
-for /f "tokens=*" %%i in ('node --version 2^>^&1') do echo [OK] Node: %%i
-for /f "tokens=*" %%i in ('cargo --version 2^>^&1') do echo [OK] %%i
+echo [OK] All tools found.
 echo.
 
-:: ==========================================================
-:: STEP 1: Git Pull
-:: ==========================================================
 echo [1/5] Pulling latest changes from GitHub...
-set "REPO_URL=https://github.com/ChickenRamen500/tunnelcraft.git"
-
-:: Try simple pull first (works if git has cached credentials or SSH)
-git pull --ff-only 2>&1
-if %ERRORLEVEL% neq 0 (
-    :: If simple pull fails, try using .github-token file
-    if exist ".github-token" (
-        echo       Standard pull failed, retrying with .github-token...
-        set /p PAT=<.github-token
-        if not "!PAT!"=="" (
-            set "AUTH_URL=https://ChickenRamen500:!PAT!@github.com/ChickenRamen500/tunnelcraft.git"
-            git remote set-url origin "!AUTH_URL!" 2>nul
-            git pull --ff-only 2>&1
-            git remote set-url origin "%REPO_URL%" 2>nul
-        )
-    )
-)
+git pull --ff-only
 if %ERRORLEVEL% neq 0 (
     echo [WARN] git pull failed. Continuing with local code...
 ) else (
@@ -81,15 +55,12 @@ if %ERRORLEVEL% neq 0 (
 )
 echo.
 
-:: ==========================================================
-:: STEP 2: Download external binaries (if missing)
-:: ==========================================================
 if not exist "bin\xray-core.exe" (
     echo [2/5] Downloading external binaries (first run)...
     if exist "scripts\download-binaries.ps1" (
         powershell -ExecutionPolicy Bypass -File scripts\download-binaries.ps1
         if %ERRORLEVEL% neq 0 (
-            echo [WARN] Some binaries failed to download. Core features may be limited.
+            echo [WARN] Some binaries failed to download.
         )
     ) else (
         echo [WARN] scripts\download-binaries.ps1 not found. Skipping.
@@ -99,9 +70,6 @@ if not exist "bin\xray-core.exe" (
 )
 echo.
 
-:: ==========================================================
-:: STEP 3: Build Go daemon (tunnelcraftd.exe)
-:: ==========================================================
 echo [3/5] Building Go daemon (tunnelcraftd.exe)...
 pushd core\cmd\tunnelcraftd
 go build -o ..\..\..\bin\tunnelcraftd.exe .
@@ -115,9 +83,6 @@ popd
 echo [OK] tunnelcraftd.exe built successfully.
 echo.
 
-:: ==========================================================
-:: STEP 4: Install npm dependencies (if needed)
-:: ==========================================================
 if not exist "ui\node_modules" (
     echo [4/5] Installing npm dependencies (may take 2-5 min on first run)...
     pushd ui
@@ -135,9 +100,6 @@ if not exist "ui\node_modules" (
 )
 echo.
 
-:: ==========================================================
-:: STEP 5: Launch Tauri dev mode
-:: ==========================================================
 echo [5/5] Launching TunnelCraft (Tauri dev mode)...
 echo.
 echo ============================================================
