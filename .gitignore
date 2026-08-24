@@ -1,0 +1,7 @@
+/ui/node_modules
+/ui/src-tauri/target/debug
+ui/src-tauri/target/.rustc_info.json
+ui/src-tauri/target/CACHEDIR.TAG
+bin/tunnelcraftd.exe
+bin/.gitkeep
+bin/data/config.yaml
