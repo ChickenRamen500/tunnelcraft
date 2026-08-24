@@ -1,11 +1,11 @@
 import { useEffect, useState, useMemo } from "react";
 import { Search, Star, RefreshCw, Filter, Upload } from "lucide-react";
 import { useConnectionStore } from "@/stores/connection";
-import { listServers, connectServer, importServer, type Server } from "@/hooks/useApi";
+import { listServers, importServer, type Server } from "@/hooks/useApi";
 import ServerCard from "@/components/ServerCard";
 
 export default function Servers() {
-  const { servers, setServers, status, setActiveServer } = useConnectionStore();
+  const { servers, setServers, status, activeServer, setActiveServer } = useConnectionStore();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("all");
   const [loading, setLoading] = useState(false);
@@ -28,13 +28,9 @@ export default function Servers() {
     fetchServers();
   }, []);
 
-  const handleConnect = async (server: Server) => {
-    try {
-      setActiveServer(server);
-      await connectServer(server.id);
-    } catch (e) {
-      console.error(e);
-    }
+
+  const handleSelectServer = (server: Server) => {
+    setActiveServer(server);
   };
 
   const handleImport = async () => {
@@ -194,8 +190,8 @@ export default function Servers() {
                   <ServerCard
                     key={server.id}
                     server={server}
-                    isActive={status.server_id === server.id}
-                    onClick={handleConnect}
+                    isActive={status.server_id === server.id || activeServer?.id === server.id}
+                    onClick={handleSelectServer}
                   />
                 ))}
               </div>

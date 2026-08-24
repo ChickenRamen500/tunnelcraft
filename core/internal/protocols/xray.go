@@ -190,9 +190,9 @@ func (x *XrayHandler) buildStreamSettings(server *engine.ServerConfig) map[strin
                         "serviceName": server.GRPCService,
                 }
         case "kcp":
-                stream["kcpSettings"] = map[string]interface{}{
-                        "seed": server.KCPSeed,
-                }
+                // Xray 26.x removed header & seed from kcpSettings.
+                // Only pass congestion control if explicitly set.
+                stream["kcpSettings"] = map[string]interface{}{}
         case "xhttp":
                 stream["xhttpSettings"] = map[string]interface{}{
                         "path": server.XHTTPPath,

@@ -428,7 +428,7 @@ func (s *SingBoxHandler) buildDNS(settings *protos.Settings) map[string]interfac
         }
 
         // If dns_chain is enabled, add configured providers
-        if settings != nil && settings.DnsChain.Enabled {
+        if settings != nil && settings.DnsChain != nil && settings.DnsChain.Enabled {
                 for _, p := range settings.DnsChain.Doh {
                         dnsServers = append(dnsServers, map[string]interface{}{
                                 "tag":     p.Name,

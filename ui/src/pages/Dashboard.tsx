@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback } from "react";
 import { Power, ArrowDown, ArrowUp, Clock, Zap, AlertTriangle } from "lucide-react";
 import { useConnectionStore } from "@/stores/connection";
 import { getConnectionStatus, connectServer, disconnectServer, formatBytes } from "@/hooks/useApi";
@@ -18,8 +18,6 @@ export default function Dashboard() {
     updateSpeed,
     setConnecting,
   } = useConnectionStore();
-
-  const [lastServerId, setLastServerId] = useState<string | null>(null);
 
   const isConnected = status.state === "CONNECTED";
   const isDisconnected = status.state === "DISCONNECTED" || status.state === "ERROR";
@@ -63,12 +61,11 @@ export default function Dashboard() {
         setConnecting(false);
       }
     } else {
-      const serverId = lastServerId || status.server_id || "";
+      const serverId = activeServer?.id || status.server_id || "";
       if (!serverId) return;
       setConnecting(true);
       try {
         await connectServer(serverId);
-        setLastServerId(serverId);
       } finally {
         setConnecting(false);
       }
@@ -111,7 +108,10 @@ export default function Dashboard() {
               <span>Fallback режим</span>
             </div>
           )}
-          {isDisconnected && (
+          {isDisconnected && activeServer && (
+            <div className="text-sm text-[var(--text-secondary)]">{activeServer.name}</div>
+          )}
+          {isDisconnected && !activeServer && (
             <div className="text-[var(--text-muted)] text-sm">Выберите сервер для подключения</div>
           )}
         </div>
