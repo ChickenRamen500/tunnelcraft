@@ -168,15 +168,32 @@ func (x *XrayHandler) buildStreamSettings(server *engine.ServerConfig) map[strin
                 stream["tlsSettings"] = tlsSettings
 
         case "reality":
-                tlsSettings := map[string]interface{}{
-                        "serverName": server.SNI,
-                        "fingerprint": server.Fingerprint,
-                        "realitySettings": map[string]interface{}{
-                                "publicKey": server.PublicKey,
-                                "shortId":   server.ShortID,
-                        },
+                if server.PublicKey == "" {
+                        // REALITY requires a public key; if missing, fall back to plain TLS or none.
+                        x.appendLog("[xray] WARNING: security=reality but publicKey is empty, falling back to tls")
+                        tlsSettings := map[string]interface{}{}
+                        if server.SNI != "" {
+                                tlsSettings["serverName"] = server.SNI
+                        }
+                        if server.Fingerprint != "" {
+                                tlsSettings["fingerprint"] = server.Fingerprint
+                        }
+                        if server.ALPN != "" {
+                                tlsSettings["alpn"] = strings.Split(server.ALPN, ",")
+                        }
+                        stream["tlsSettings"] = tlsSettings
+                        stream["security"] = "tls"
+                } else {
+                        tlsSettings := map[string]interface{}{
+                                "serverName": server.SNI,
+                                "fingerprint": server.Fingerprint,
+                                "realitySettings": map[string]interface{}{
+                                        "publicKey": server.PublicKey,
+                                        "shortId":   server.ShortID,
+                                },
+                        }
+                        stream["tlsSettings"] = tlsSettings
                 }
-                stream["tlsSettings"] = tlsSettings
         }
 
         // Transport-specific settings

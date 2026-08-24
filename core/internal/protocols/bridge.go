@@ -4,6 +4,7 @@ import (
         "context"
         "encoding/json"
         "fmt"
+        "net"
         "os"
         "path/filepath"
 
@@ -166,8 +167,19 @@ func (s *SingBoxHandler) generateBridgeConfig(server *engine.ServerConfig, bridg
         // Add server endpoint IP to exclude (so xray can reach it directly)
         // This is critical: without this, the TUN would capture xray's outbound traffic
         // causing a routing loop.
+        // NOTE: route_exclude_address only accepts valid CIDR IP prefixes.
+        // If server.Host is a domain, resolve it first. Fall back to a DNS rule.
         if server.Host != "" {
-                routeExclude = append(routeExclude, server.Host+"/32")
+                ip := net.ParseIP(server.Host)
+                if ip != nil {
+                        if ipv4 := ip.To4(); ipv4 != nil {
+                                routeExclude = append(routeExclude, ipv4.String()+"/32")
+                        } else {
+                                routeExclude = append(routeExclude, ip.String()+"/128")
+                        }
+                }
+                // If Host is a domain, we cannot add it to route_exclude_address.
+                // Instead, we add a DNS rule to route the server domain via direct.
         }
 
         // Build routing rules
@@ -176,6 +188,15 @@ func (s *SingBoxHandler) generateBridgeConfig(server *engine.ServerConfig, bridg
                         "ip_is_private": true,
                         "outbound":      "direct",
                 },
+        }
+
+        // If server host is a domain (not IP), add a DNS rule to route it via direct
+        // to avoid routing loop through the TUN adapter.
+        if server.Host != "" && net.ParseIP(server.Host) == nil {
+                rules = append(rules, map[string]interface{}{
+                        "domain":  []string{server.Host},
+                        "outbound": "direct",
+                })
         }
 
         // Add geoip-ru bypass if enabled

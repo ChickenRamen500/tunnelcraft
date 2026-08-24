@@ -190,6 +190,8 @@ func parseShareLink(line string) (engine.ServerConfig, error) {
                 return parseShadowsocks(line)
         case strings.HasPrefix(line, "hysteria2://") || strings.HasPrefix(line, "hy2://"):
                 return parseHysteria2(line)
+        case strings.HasPrefix(line, "hysteria://"):
+                return parseHysteria(line)
         case strings.HasPrefix(line, "wg://"):
                 return parseWireGuard(line)
         case strings.HasPrefix(line, "awg://"):
@@ -480,7 +482,7 @@ func parseShadowsocks(raw string) (engine.ServerConfig, error) {
 func parseHysteria2(raw string) (engine.ServerConfig, error) {
         var cfg engine.ServerConfig
         cfg.ID = uuid.New().String()
-        cfg.Protocol = engine.ProtocolHysteria
+        cfg.Protocol = engine.ProtocolHysteria2
 
         // Normalise scheme.
         var body string
@@ -516,8 +518,18 @@ func parseHysteria2(raw string) (engine.ServerConfig, error) {
         // Query params.
         cfg.HysteriaSNI = query.Get("sni")
         cfg.HysteriaInsecure = query.Get("insecure") == "1"
-        cfg.HysteriaObfs = query.Get("obfs")
         cfg.HysteriaALPN = query.Get("alpn")
+
+        // Obfs: "obfs" param holds the type (e.g. "salamander"),
+        // "obfs-password" holds the actual password used by sing-box.
+        if v := query.Get("obfs-password"); v != "" {
+                cfg.HysteriaObfs = v
+        } else if v := query.Get("obfs"); v != "" && v != "salamander" {
+                // Some providers put the password directly in the obfs param.
+                cfg.HysteriaObfs = v
+        }
+        // If obfs=salamander but no obfs-password, don't set HysteriaObfs
+        // (sing-box needs the password, not the type name).
 
         // Bandwidth in Mbps.
         if v := query.Get("upmbps"); v != "" {
@@ -531,10 +543,67 @@ func parseHysteria2(raw string) (engine.ServerConfig, error) {
                 }
         }
 
-        // obfs-password may be appended to the obfs param in some implementations.
-        if v := query.Get("obfs-password"); v != "" {
+        return cfg, nil
+}
+
+// ---------------------------------------------------------------------------
+// Hysteria (v1) parser
+// ---------------------------------------------------------------------------
+
+// parseHysteria handles hysteria:// URI form (Hysteria v1):
+//
+//      hysteria://auth@host:port/?peer=sni&insecure=1&upmbps=100&downmbps=200&obfs=type&obfs-param=password&alpn=protocol#name
+func parseHysteria(raw string) (engine.ServerConfig, error) {
+        var cfg engine.ServerConfig
+        cfg.ID = uuid.New().String()
+        cfg.Protocol = engine.ProtocolHysteria
+
+        body := raw[len("hysteria://"):]
+
+        // Split fragment.
+        body, frag := splitFragment(body)
+        cfg.Name = frag
+
+        // Split query.
+        body, queryStr := splitQuery(body)
+        query, err := url.ParseQuery(queryStr)
+        if err != nil {
+                return cfg, fmt.Errorf("invalid query string: %w", err)
+        }
+
+        // Parse auth@host:port.
+        host, port, auth, err := parseUserHostPort(body)
+        if err != nil {
+                return cfg, err
+        }
+        cfg.Host = host
+        cfg.Port = port
+        cfg.HysteriaAuth = auth
+
+        // Query params.
+        cfg.HysteriaSNI = query.Get("peer") // Hysteria v1 uses "peer" for SNI
+        cfg.HysteriaInsecure = query.Get("insecure") == "1"
+        cfg.HysteriaALPN = query.Get("alpn")
+
+        // Obfs for v1: obfs param = type, obfs-param = password
+        if v := query.Get("obfs-param"); v != "" {
                 cfg.HysteriaObfs = v
         }
+
+        // Bandwidth in Mbps.
+        if v := query.Get("upmbps"); v != "" {
+                if mbps, e := strconv.ParseUint(v, 10, 64); e == nil {
+                        cfg.HysteriaBwUp = mbps * 1_000_000
+                }
+        }
+        if v := query.Get("downmbps"); v != "" {
+                if mbps, e := strconv.ParseUint(v, 10, 64); e == nil {
+                        cfg.HysteriaBwDown = mbps * 1_000_000
+                }
+        }
+
+        // Protocol for v1: some providers specify "kcp" or "quic"
+        cfg.HysteriaFastOpen = query.Get("fastopen") == "1"
 
         return cfg, nil
 }
@@ -1140,7 +1209,7 @@ func parseSingBoxHysteria2(raw json.RawMessage) (engine.ServerConfig, error) {
 
         cfg := engine.ServerConfig{
                 ID:             uuid.New().String(),
-                Protocol:       engine.ProtocolHysteria,
+                Protocol:       engine.ProtocolHysteria2,
                 Host:           h.Server,
                 Port:           h.ServerPort,
                 HysteriaAuth:   h.Password,
@@ -1479,13 +1548,33 @@ func clashProxyToConfig(p *clashProxy) (engine.ServerConfig, error) {
                 applyClashTLS(p, &cfg)
                 applyClashTransport(p, &cfg)
 
-        case "hysteria2":
+        case "hysteria":
                 cfg.Protocol = engine.ProtocolHysteria
+                cfg.HysteriaAuth = p.AuthStr
+                cfg.HysteriaSNI = p.ServerName
+                cfg.HysteriaInsecure = p.SkipCertVerify
+                cfg.HysteriaALPN = p.ALPN
+                if p.Obfs != "" {
+                        cfg.HysteriaObfs = p.Obfs
+                }
+                if p.UpMbps > 0 {
+                        cfg.HysteriaBwUp = uint64(p.UpMbps) * 1_000_000
+                }
+                if p.DownMbps > 0 {
+                        cfg.HysteriaBwDown = uint64(p.DownMbps) * 1_000_000
+                }
+
+        case "hysteria2":
+                cfg.Protocol = engine.ProtocolHysteria2
                 cfg.HysteriaAuth = p.Password
                 cfg.HysteriaSNI = p.ServerName
                 cfg.HysteriaInsecure = p.SkipCertVerify
                 cfg.HysteriaALPN = p.ALPN
-                cfg.HysteriaObfs = p.Obfs
+                // Clash obfs field for hysteria2 usually contains the password directly,
+                // not the type name.
+                if p.Obfs != "" {
+                        cfg.HysteriaObfs = p.Obfs
+                }
                 if p.UpMbps > 0 {
                         cfg.HysteriaBwUp = uint64(p.UpMbps) * 1_000_000
                 }
@@ -1679,6 +1768,7 @@ func hasShareLinkPrefix(s string) bool {
                         strings.HasPrefix(line, "ss://"),
                         strings.HasPrefix(line, "hysteria2://"),
                         strings.HasPrefix(line, "hy2://"),
+				strings.HasPrefix(line, "hysteria://"),
                         strings.HasPrefix(line, "wg://"),
                         strings.HasPrefix(line, "awg://"):
                         return true

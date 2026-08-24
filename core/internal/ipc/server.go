@@ -898,7 +898,7 @@ func serverConfigToEntry(sc engine.ServerConfig) config.ServerEntry {
                 Favorite: sc.Favorite, SortOrder: sc.SortOrder, SubscriptionID: sc.SubscriptionID,
         }
         switch sc.Protocol {
-        case engine.ProtocolVLESS, engine.ProtocolVMESS:
+        case engine.ProtocolVLESS, engine.ProtocolVMESS, engine.ProtocolTrojan, engine.ProtocolShadowsocks, engine.ProtocolTuic:
                 entry.XrayConfig = &config.XrayConfigEntry{
                         UUID: sc.UUID, Flow: sc.Flow, Security: sc.Security,
                         Transport: sc.Transport, SNI: sc.SNI, Fingerprint: sc.Fingerprint,
@@ -912,7 +912,7 @@ func serverConfigToEntry(sc engine.ServerConfig) config.ServerEntry {
                         PresharedKey: sc.WGPresharedKey, LocalAddress: sc.WGLocalAddress,
                         DNSServers: sc.WGDNSServers, AllowedIPs: sc.WGAllowedIPs,
                 }
-        case engine.ProtocolHysteria:
+        case engine.ProtocolHysteria, engine.ProtocolHysteria2:
                 entry.HysteriaConfig = &config.HysteriaConfigEntry{
                         AuthPassword: sc.HysteriaAuth, SNI: sc.HysteriaSNI,
                         Insecure: sc.HysteriaInsecure, ALPN: sc.HysteriaALPN,
