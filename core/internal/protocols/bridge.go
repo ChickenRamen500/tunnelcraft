@@ -98,9 +98,12 @@ func (b *BridgeHandler) Stop() error {
         return nil
 }
 
-// IsRunning returns whether both processes are alive.
+// IsRunning returns whether BOTH processes are alive.
+// In bridge mode both xray and sing-box must be running for the connection to work.
+// Using AND (not OR) so that if sing-box dies, the 2-second grace period in
+// Connect() correctly detects the failure instead of reporting success.
 func (b *BridgeHandler) IsRunning() bool {
-        return b.singbox.IsRunning() || b.xray.IsRunning()
+        return b.singbox.IsRunning() && b.xray.IsRunning()
 }
 
 // GetLogs returns logs from both processes.
@@ -199,12 +202,9 @@ func (s *SingBoxHandler) generateBridgeConfig(server *engine.ServerConfig, bridg
                 })
         }
 
-        // Add geoip-ru bypass if enabled
+        // Add geoip-ru bypass if enabled (domain-based only, no remote rule-set download
+        // which would fail when TUN captures all traffic or raw.githubusercontent.com is blocked).
         if settings != nil && settings.RoutingSettings != nil && settings.RoutingSettings.BypassRu {
-                rules = append(rules, map[string]interface{}{
-                        "rule_set":    "geoip-ru",
-                        "outbound":    "direct",
-                })
                 rules = append(rules, map[string]interface{}{
                         "domain_suffix": []string{".ru", ".\u0440\u0444"},
                         "outbound":      "direct",
@@ -260,18 +260,9 @@ func (s *SingBoxHandler) generateBridgeConfig(server *engine.ServerConfig, bridg
                 },
         }
 
-        // Add geoip-ru rule_set if bypass_ru is enabled
-        if settings != nil && settings.RoutingSettings != nil && settings.RoutingSettings.BypassRu {
-                cfg["route"].(map[string]interface{})["rule_set"] = []map[string]interface{}{
-                        {
-                                "type":            "remote",
-                                "tag":             "geoip-ru",
-                                "format":          "binary",
-                                "url":             "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-ru.srs",
-                                "download_detour": "direct",
-                        },
-                }
-        }
+        // No remote rule-sets: they require downloading external files which fails
+        // when TUN captures all traffic (routing loop) or the host is unreachable.
+        // Russian IP bypass is handled by domain_suffix rules above (.ru, .рф).
 
         data, err := json.MarshalIndent(cfg, "", "  ")
         if err != nil {

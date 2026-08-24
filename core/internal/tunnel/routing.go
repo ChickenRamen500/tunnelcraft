@@ -137,12 +137,12 @@ func (r *RoutingManager) setupProxyRouting(socksPort, httpPort uint32) error {
 
 	// Set TUN adapter IP
 	if err := r.setInterfaceIP(TUNAdapterName, tunIP+"/24"); err != nil {
-		log.Printf("[routing] failed to set TUN IP: %v", err)
+		return fmt.Errorf("failed to set TUN IP: %w", err)
 	}
 
 	// Add default route through TUN (with high metric to coexist with LAN)
 	if err := r.addRoute("0.0.0.0/0"); err != nil {
-		log.Printf("[routing] failed to add default route: %v", err)
+		return fmt.Errorf("failed to add default route: %w", err)
 	}
 
 	log.Printf("[routing] proxy routing configured (SOCKS: %d, HTTP: %d)", socksPort, httpPort)

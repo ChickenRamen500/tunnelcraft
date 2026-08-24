@@ -202,8 +202,12 @@ func (m *Manager) Connect(ctx context.Context, serverID string) error {
         }
         log.Printf("[manager] subprocess is alive after grace period")
 
-        // Setup TUN and routing
-        if m.tunnel != nil {
+        // Setup TUN and routing.
+        // Skip for bridge mode: sing-box creates and manages its own TUN adapter
+        // via wintun.dll internally. The Go-level RoutingManager only handles
+        // protocols that don't bring their own TUN (e.g. plain SOCKS proxy mode).
+        isBridge := handler.Name() == "bridge"
+        if m.tunnel != nil && !isBridge {
                 if err := m.tunnel.Setup(socksPort, httpPort, server); err != nil {
                         // TUN setup failed — stop the protocol
                         handler.Stop()
@@ -219,6 +223,8 @@ func (m *Manager) Connect(ctx context.Context, serverID string) error {
 
                 // Apply routing rules
                 _ = m.tunnel.ApplyRoutingRules(cfg.Routing.Rules)
+        } else if isBridge {
+                log.Println("[manager] bridge mode: skipping Go-level TUN/routing (sing-box manages TUN)")
         }
 
         // Connection established

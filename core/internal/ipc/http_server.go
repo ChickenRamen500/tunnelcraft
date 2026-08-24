@@ -476,6 +476,13 @@ func (h *HTTPServer) handleRefreshSubscription(w http.ResponseWriter, req *http.
         prov := subscription.NewProvider(h.cfg)
         result := prov.Fetch(ctx, subID)
 
+        // Log parse errors so the user can see why some servers were skipped.
+        if len(result.ParseErrors) > 0 {
+                for _, pe := range result.ParseErrors {
+                        log.Printf("[subscription] parse error for %s: %s", subID, pe.Error())
+                }
+        }
+
         if result.Error != "" {
                 h.jsonErr(w, http.StatusBadGateway, result.Error)
                 return
@@ -505,10 +512,17 @@ func (h *HTTPServer) handleRefreshSubscription(w http.ResponseWriter, req *http.
                 return
         }
 
+        // Also include parse errors in the response so the UI can show them.
+        var errStrings []string
+        for _, pe := range result.ParseErrors {
+                errStrings = append(errStrings, pe.Error())
+        }
+
         h.json(w, http.StatusOK, map[string]interface{}{
                 "added":   len(entries),
                 "updated": 0,
                 "removed": removed,
+                "parse_errors": errStrings,
         })
 }
 

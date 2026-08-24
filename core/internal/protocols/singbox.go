@@ -489,12 +489,10 @@ func (s *SingBoxHandler) buildRoute(settings *protos.Settings, server *engine.Se
                 rules = append(rules, singboxRule)
         }
 
-        // Add geoip-ru rule if bypass_ru is enabled
+        // Add Russian domain bypass if bypass_ru is enabled (domain-based only,
+        // no remote rule-set download which would fail when TUN captures all traffic
+        // or raw.githubusercontent.com is blocked).
         if settings != nil && settings.RoutingSettings != nil && settings.RoutingSettings.BypassRu {
-                rules = append(rules, map[string]interface{}{
-                        "rule_set":    "geoip-ru",
-                        "outbound":    "direct",
-                })
                 rules = append(rules, map[string]interface{}{
                         "domain_suffix": []string{".ru", ".рф"},
                         "outbound":      "direct",
@@ -511,18 +509,8 @@ func (s *SingBoxHandler) buildRoute(settings *protos.Settings, server *engine.Se
                 "auto_detect_interface": true,
         }
 
-        // Add rule_set for geoip-ru if bypass_ru is enabled
-        if settings != nil && settings.RoutingSettings != nil && settings.RoutingSettings.BypassRu {
-                routeCfg["rule_set"] = []map[string]interface{}{
-                        {
-                                "type":            "remote",
-                                "tag":             "geoip-ru",
-                                "format":          "binary",
-                                "url":             "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-ru.srs",
-                                "download_detour": "direct",
-                        },
-                }
-        }
+        // No remote rule-sets: they require downloading external files which fails
+        // when TUN captures all traffic (routing loop) or the host is unreachable.
 
         return routeCfg
 }
