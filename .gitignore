@@ -5,3 +5,4 @@ ui/src-tauri/target/CACHEDIR.TAG
 bin/tunnelcraftd.exe
 bin/.gitkeep
 bin/data/config.yaml
+package-lock.json
