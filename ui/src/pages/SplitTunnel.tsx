@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus, Trash2, Shield, Globe, Ban, ArrowRight } from "lucide-react";
-import { getRoutingRules, type RoutingRule } from "@/hooks/useApi";
+import { getRoutingRules, createRoutingRule, deleteRoutingRule, updateRoutingRule, type RoutingRule } from "@/hooks/useApi";
 
 export default function SplitTunnel() {
   const [rules, setRules] = useState<RoutingRule[]>([]);
@@ -41,10 +41,9 @@ export default function SplitTunnel() {
     }
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newDomain) return;
-    const rule: RoutingRule = {
-      id: crypto.randomUUID(),
+    const rule: Partial<RoutingRule> = {
       name: newDomain,
       enabled: true,
       action: newAction,
@@ -53,20 +52,35 @@ export default function SplitTunnel() {
       geoip_codes: [],
       processes: [],
     };
-    setRules([...rules, rule]);
-    setNewDomain("");
-    setShowAdd(false);
-    // TODO: call gRPC CreateRule
+    try {
+      const res = await createRoutingRule(rule);
+      setRules([...rules, { ...rule, id: res.id } as RoutingRule]);
+      setNewDomain("");
+      setShowAdd(false);
+    } catch (e) {
+      console.error("Failed to create rule", e);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    setRules(rules.filter((r) => r.id !== id));
-    // TODO: call gRPC DeleteRule
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteRoutingRule(id);
+      setRules(rules.filter((r) => r.id !== id));
+    } catch (e) {
+      console.error("Failed to delete rule", e);
+    }
   };
 
-  const handleToggle = (id: string) => {
-    setRules(rules.map((r) => r.id === id ? { ...r, enabled: !r.enabled } : r));
-    // TODO: call gRPC UpdateRule
+  const handleToggle = async (id: string) => {
+    const rule = rules.find((r) => r.id === id);
+    if (!rule) return;
+    const updated = { ...rule, enabled: !rule.enabled };
+    try {
+      await updateRoutingRule(updated);
+      setRules(rules.map((r) => r.id === id ? updated : r));
+    } catch (e) {
+      console.error("Failed to update rule", e);
+    }
   };
 
   return (

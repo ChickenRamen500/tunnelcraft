@@ -8,6 +8,7 @@ import (
         "net/http"
         "os"
         "os/signal"
+        "path/filepath"
         "strconv"
         "strings"
         "syscall"
@@ -65,6 +66,29 @@ func (h *HTTPServer) Start(addr string) error {
         mux.HandleFunc("/api/subscriptions/refresh/", h.handleRefreshSubscription)
         mux.HandleFunc("/api/settings", h.handleSettings)
         mux.HandleFunc("/api/logs", h.handleLogs)
+        mux.HandleFunc("/api/routing", h.handleRouting)
+        mux.HandleFunc("/api/routing/rules", h.handleRoutingRules)
+
+        // Serve static web UI files from "ui/" subdirectory (if exists)
+        uiDir := filepath.Join(filepath.Dir(h.cfg.GetConfigPath()), "ui")
+        if _, err := os.Stat(uiDir); err == nil {
+                fs := http.FileServer(http.Dir(uiDir))
+                // Serve index.html for non-API, non-file routes (SPA support)
+                mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+                        if strings.HasPrefix(r.URL.Path, "/api/") {
+                                http.NotFound(w, r)
+                                return
+                        }
+                        // Try to serve the file; if not found, serve index.html for SPA routing
+                        path := filepath.Join(uiDir, filepath.Clean(r.URL.Path))
+                        if _, err := os.Stat(path); err == nil {
+                                fs.ServeHTTP(w, r)
+                        } else {
+                                http.ServeFile(w, r, filepath.Join(uiDir, "index.html"))
+                        }
+                }))
+                h.logger.Printf("Web UI enabled at / (serving from %s)", uiDir)
+        }
 
         h.httpSrv = &http.Server{
                 Addr:              addr,
@@ -638,6 +662,129 @@ func (h *HTTPServer) handleLogs(w http.ResponseWriter, req *http.Request) {
                 "logs":  logLines,
                 "count": len(logLines),
         })
+}
+
+// --- Routing / Split Tunneling API ---
+
+// GET /api/routing — get routing config (rules + domain strategy)
+// PUT /api/routing — update domain strategy
+func (h *HTTPServer) handleRouting(w http.ResponseWriter, req *http.Request) {
+        switch req.Method {
+        case http.MethodGet:
+                cfg := h.cfg.Get()
+                h.json(w, http.StatusOK, map[string]interface{}{
+                        "domain_strategy": cfg.Routing.DomainStrategy,
+                        "rules":          cfg.Routing.Rules,
+                })
+        case http.MethodPut:
+                var body struct {
+                        DomainStrategy string `json:"domain_strategy"`
+                }
+                if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+                        h.jsonErr(w, http.StatusBadRequest, "invalid JSON body")
+                        return
+                }
+                if err := h.cfg.Update(func(c *config.Config) {
+                        if body.DomainStrategy != "" {
+                                c.Routing.DomainStrategy = body.DomainStrategy
+                        }
+                }); err != nil {
+                        h.jsonErr(w, http.StatusInternalServerError, err.Error())
+                        return
+                }
+                h.json(w, http.StatusOK, map[string]string{"status": "ok"})
+        default:
+                h.jsonErr(w, http.StatusMethodNotAllowed, "GET or PUT required")
+        }
+}
+
+// POST   /api/routing/rules — create a new rule
+// GET    /api/routing/rules — list all rules (same as GET /api/routing, kept for REST consistency)
+// PUT    /api/routing/rules — update a rule (by id in body)
+// DELETE /api/routing/rules?id=xxx — delete a rule by id
+func (h *HTTPServer) handleRoutingRules(w http.ResponseWriter, req *http.Request) {
+        switch req.Method {
+        case http.MethodGet:
+                cfg := h.cfg.Get()
+                h.json(w, http.StatusOK, map[string]interface{}{
+                        "rules": cfg.Routing.Rules,
+                })
+
+        case http.MethodPost:
+                var rule config.RoutingRule
+                if err := json.NewDecoder(req.Body).Decode(&rule); err != nil {
+                        h.jsonErr(w, http.StatusBadRequest, "invalid JSON body")
+                        return
+                }
+                if rule.ID == "" {
+                        rule.ID = engine.GenerateID()
+                }
+                if rule.Name == "" && len(rule.Domains) > 0 {
+                        rule.Name = rule.Domains[0]
+                }
+                if err := h.cfg.Update(func(c *config.Config) {
+                        c.Routing.Rules = append(c.Routing.Rules, rule)
+                }); err != nil {
+                        h.jsonErr(w, http.StatusInternalServerError, err.Error())
+                        return
+                }
+                h.json(w, http.StatusOK, map[string]interface{}{"id": rule.ID, "status": "created"})
+
+        case http.MethodPut:
+                var updated config.RoutingRule
+                if err := json.NewDecoder(req.Body).Decode(&updated); err != nil {
+                        h.jsonErr(w, http.StatusBadRequest, "invalid JSON body")
+                        return
+                }
+                found := false
+                if err := h.cfg.Update(func(c *config.Config) {
+                        for i, r := range c.Routing.Rules {
+                                if r.ID == updated.ID {
+                                        c.Routing.Rules[i] = updated
+                                        found = true
+                                        break
+                                }
+                        }
+                }); err != nil {
+                        h.jsonErr(w, http.StatusInternalServerError, err.Error())
+                        return
+                }
+                if !found {
+                        h.jsonErr(w, http.StatusNotFound, "rule not found")
+                        return
+                }
+                h.json(w, http.StatusOK, map[string]string{"status": "updated"})
+
+        case http.MethodDelete:
+                ruleID := req.URL.Query().Get("id")
+                if ruleID == "" {
+                        h.jsonErr(w, http.StatusBadRequest, "id query parameter is required")
+                        return
+                }
+                found := false
+                if err := h.cfg.Update(func(c *config.Config) {
+                        var filtered []config.RoutingRule
+                        for _, r := range c.Routing.Rules {
+                                if r.ID == ruleID {
+                                        found = true
+                                } else {
+                                        filtered = append(filtered, r)
+                                }
+                        }
+                        c.Routing.Rules = filtered
+                }); err != nil {
+                        h.jsonErr(w, http.StatusInternalServerError, err.Error())
+                        return
+                }
+                if !found {
+                        h.jsonErr(w, http.StatusNotFound, "rule not found")
+                        return
+                }
+                h.json(w, http.StatusOK, map[string]string{"status": "deleted"})
+
+        default:
+                h.jsonErr(w, http.StatusMethodNotAllowed, "GET, POST, PUT, or DELETE required")
+        }
 }
 
 // isConfFile checks if the content looks like a WireGuard/AmneziaWG .conf file.

@@ -371,6 +371,13 @@ func (m *Manager) Update(fn func(*Config)) error {
         return m.saveLocked()
 }
 
+// GetConfigPath returns the path to the config file.
+func (m *Manager) GetConfigPath() string {
+        m.mu.RLock()
+        defer m.mu.RUnlock()
+        return m.path
+}
+
 // GetServers returns the list of configured servers.
 func (m *Manager) GetServers() []ServerEntry {
         m.mu.RLock()

@@ -107,21 +107,37 @@ func main() {
         }
 
         // 1. Protocol handlers
+        //
+        // VLESS with XHTTP or KCP transport uses Bridge mode:
+        //   sing-box (TUN) → SOCKS5 → xray-core (XHTTP/KCP outbound) → remote server
+        // All other protocols use sing-box directly (it has TUN built-in).
+        //
+        // IMPORTANT: The bridge handler is NOT registered in the map below.
+        // Instead, Connect() checks for XHTTP/KCP and uses the bridge handler directly.
+        // See engine/manager.go → Connect() for the dispatch logic.
+
+        singboxPath := filepath.Join(*binDir, "sing-box.exe")
+
         protoHandlers := map[engine.Protocol]engine.ProtocolHandler{
-                engine.ProtocolVLESS:         protocols.NewSingBoxHandler(filepath.Join(*binDir, "sing-box.exe")),
-                engine.ProtocolVMESS:         protocols.NewSingBoxHandler(filepath.Join(*binDir, "sing-box.exe")),
-                engine.ProtocolTrojan:        protocols.NewSingBoxHandler(filepath.Join(*binDir, "sing-box.exe")),
-                engine.ProtocolShadowsocks:   protocols.NewSingBoxHandler(filepath.Join(*binDir, "sing-box.exe")),
-                engine.ProtocolHysteria2:     protocols.NewSingBoxHandler(filepath.Join(*binDir, "sing-box.exe")),
-                engine.ProtocolTuic:          protocols.NewSingBoxHandler(filepath.Join(*binDir, "sing-box.exe")),
-                engine.ProtocolWireGuard:     protocols.NewWireGuardHandler(wireguardExePath),
-                engine.ProtocolHysteria:      protocols.NewHysteriaHandler(filepath.Join(*binDir, "hysteria.exe")),
-                engine.ProtocolAmneziaWG:     protocols.NewAmneziaHandler(filepath.Join(*binDir, "amneziawg-go.exe")),
+                engine.ProtocolVLESS:       protocols.NewSingBoxHandler(singboxPath),
+                engine.ProtocolVMESS:       protocols.NewSingBoxHandler(singboxPath),
+                engine.ProtocolTrojan:      protocols.NewSingBoxHandler(singboxPath),
+                engine.ProtocolShadowsocks: protocols.NewSingBoxHandler(singboxPath),
+                engine.ProtocolHysteria2:   protocols.NewSingBoxHandler(singboxPath),
+                engine.ProtocolTuic:        protocols.NewSingBoxHandler(singboxPath),
+                engine.ProtocolWireGuard:   protocols.NewWireGuardHandler(wireguardExePath),
+                engine.ProtocolHysteria:    protocols.NewHysteriaHandler(filepath.Join(*binDir, "hysteria.exe")),
+                engine.ProtocolAmneziaWG:   protocols.NewAmneziaHandler(filepath.Join(*binDir, "amneziawg-go.exe")),
         }
 
         // 2. Connection manager
         mgr := engine.NewManager(cfgMgr)
         mgr.SetProtocolHandlers(protoHandlers)
+
+        // Set bridge factory for XHTTP/KCP transports
+        mgr.SetBridgeFactory(func(xrayPath, singboxPath string) engine.ProtocolHandler {
+                return protocols.NewBridgeHandler(xrayPath, singboxPath)
+        })
 
         // Clean up leftover TUN adapters from previous crash
         cleanupCmd := exec.Command("powershell", "-Command",
