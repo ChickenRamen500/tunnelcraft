@@ -228,6 +228,8 @@ func (s *SingBoxHandler) generateBridgeConfig(server *engine.ServerConfig, bridg
                                 "type":                      "tun",
                                 "tag":                       "tun-in",
                                 "interface_name":            "tunnelcraft",
+                                "inet4_address":             "10.200.0.1/24",
+                                "inet6_address":             "fd00::1/126",
                                 "stack":                     "mixed",
                                 "mtu":                       1400,
                                 "auto_route":                true,

@@ -174,6 +174,10 @@ func Parse(rawContent []byte) ([]engine.ServerConfig, []ParseError) {
                 if line == "" {
                         continue
                 }
+                // Skip comment lines (e.g. "# profile-title: ...", "# Date/Time: ...").
+                if strings.HasPrefix(line, "#") {
+                        continue
+                }
 
                 s, err := parseShareLink(line)
                 if err != nil {
@@ -2051,23 +2055,47 @@ func tryBase64Decode(data []byte) ([]byte, error) {
 
 // base64DecodeAny tries all base64 variants on a short string (used inside
 // individual link parsers for vmess://, wg://, awg:// bodies).
+// It trims whitespace, tries URL-unescaping, and replaces URL-safe chars
+// with standard ones to maximise compatibility with different providers.
 func base64DecodeAny(s string) ([]byte, error) {
-        // Try with padding.
-        if m := len(s) % 4; m != 0 {
-                padded := s + strings.Repeat("=", 4-m)
-                if b, err := base64.StdEncoding.DecodeString(padded); err == nil {
+        // Step 1: Trim whitespace/newlines that some providers embed.
+        s = strings.TrimSpace(s)
+        s = strings.ReplaceAll(s, "\n", "")
+        s = strings.ReplaceAll(s, "\r", "")
+
+        // Build a list of candidate strings to try.
+        candidates := []string{s}
+
+        // Step 2: Try URL-unescaping (some providers double-encode the base64 body).
+        if unescaped, err := url.PathUnescape(s); err == nil && unescaped != s {
+                candidates = append(candidates, unescaped)
+        }
+
+        // Step 3: Replace URL-safe characters with standard ones.
+        replaced := strings.ReplaceAll(s, "-", "+")
+        replaced = strings.ReplaceAll(replaced, "_", "/")
+        if replaced != s {
+                candidates = append(candidates, replaced)
+        }
+
+        for _, candidate := range candidates {
+                // Try with padding.
+                if m := len(candidate) % 4; m != 0 {
+                        padded := candidate + strings.Repeat("=", 4-m)
+                        if b, err := base64.StdEncoding.DecodeString(padded); err == nil {
+                                return b, nil
+                        }
+                        if b, err := base64.URLEncoding.DecodeString(padded); err == nil {
+                                return b, nil
+                        }
+                }
+                // Raw variants.
+                if b, err := base64.RawStdEncoding.DecodeString(candidate); err == nil {
                         return b, nil
                 }
-                if b, err := base64.URLEncoding.DecodeString(padded); err == nil {
+                if b, err := base64.RawURLEncoding.DecodeString(candidate); err == nil {
                         return b, nil
                 }
-        }
-        // Raw variants.
-        if b, err := base64.RawStdEncoding.DecodeString(s); err == nil {
-                return b, nil
-        }
-        if b, err := base64.RawURLEncoding.DecodeString(s); err == nil {
-                return b, nil
         }
         return nil, fmt.Errorf("base64 decode failed")
 }
@@ -2180,9 +2208,13 @@ func urlFragmentDecode(s string) string {
 }
 
 // splitQuery separates the query string (after first '?') from the body.
+// Some subscription providers emit URIs like "vless://uuid@host:443/?type=tcp&..."
+// which leave a trailing '/' on the body; we strip it to avoid port parse errors.
 func splitQuery(body string) (mainBody, queryString string) {
         if idx := strings.Index(body, "?"); idx >= 0 {
-                return body[:idx], body[idx+1:]
+                mainBody = body[:idx]
+                mainBody = strings.TrimRight(mainBody, "/")
+                return mainBody, body[idx+1:]
         }
         return body, ""
 }
