@@ -5,6 +5,8 @@ package main
 import (
         "context"
         "flag"
+	"io"
+	"sync"
         "log"
         "os"
         "os/exec"
@@ -22,6 +24,19 @@ import (
 
 // Version is set at build time via -ldflags.
 var Version = "0.1.0-dev"
+
+type safeWriter struct {
+	mu sync.Mutex
+	w1 io.Writer
+	w2 io.Writer
+}
+
+func (s *safeWriter) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.w1.Write(p)
+	return s.w2.Write(p)
+}
 
 func main() {
         // Parse command-line flags
@@ -67,7 +82,22 @@ func main() {
                 c.Daemon.DataDir = *dataDir
                 c.Daemon.BinDir = *binDir
                 c.Daemon.ConfigDir = filepath.Join(baseDir, "configs")
+                if c.Log.File == "" {
+                        c.Log.File = filepath.Join(*dataDir, "tunnelcraftd.log")
+                }
         })
+        cfg = cfgMgr.Get() // refresh
+        
+        // Setup logging to file and stderr
+        if cfg.Log.File != "" {
+                f, err := os.OpenFile(cfg.Log.File, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+                if err == nil {
+                        sw := &safeWriter{w1: os.Stderr, w2: f}
+                        log.SetOutput(sw)
+                } else {
+                        log.Printf("[warn] failed to open log file %s: %v", cfg.Log.File, err)
+                }
+        }
 
         log.Printf("[info] tunnelcraftd v%s starting...", Version)
         log.Printf("[info] config:  %s", *configPath)

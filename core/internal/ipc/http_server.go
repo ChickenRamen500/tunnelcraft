@@ -33,7 +33,7 @@ func NewHTTPServer(cfg *config.Manager, mgr *engine.Manager) *HTTPServer {
         return &HTTPServer{
                 cfg:    cfg,
                 mgr:    mgr,
-                logger: log.New(os.Stderr, "[http] ", log.LstdFlags),
+                logger: log.New(log.Writer(), "[http] ", log.LstdFlags),
         }
 }
 

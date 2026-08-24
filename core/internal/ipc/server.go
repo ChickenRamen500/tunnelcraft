@@ -39,7 +39,7 @@ func NewServer(cfg *config.Manager, mgr *engine.Manager) *Server {
         s := &Server{
                 cfg:    cfg,
                 mgr:    mgr,
-                logger: log.New(os.Stderr, "[ipc] ", log.LstdFlags),
+                logger: log.New(log.Writer(), "[ipc] ", log.LstdFlags),
         }
 
         s.grpcServer = grpc.NewServer(
