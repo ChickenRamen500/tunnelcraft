@@ -190,7 +190,8 @@ export default function Servers() {
                   <ServerCard
                     key={server.id}
                     server={server}
-                    isActive={status.server_id === server.id || activeServer?.id === server.id}
+                    isSelected={activeServer?.id === server.id}
+                    isConnected={status.state === "CONNECTED" && status.server_id === server.id}
                     onClick={handleSelectServer}
                   />
                 ))}

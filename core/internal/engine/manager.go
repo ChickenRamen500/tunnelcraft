@@ -182,6 +182,26 @@ func (m *Manager) Connect(ctx context.Context, serverID string) error {
         log.Printf("[manager] handler.Start() returned successfully")
         log.Printf("[manager] Process running: %v, PID: %d", handler.IsRunning(), getProcessPID(handler))
 
+        // Verify the subprocess is still alive after a brief delay.
+        // xray / sing-box often crash immediately on invalid config (e.g.
+        // REALITY settings missing), so a 2-second grace period catches those
+        // failures before we declare the connection successful.
+        log.Printf("[manager] verifying subprocess stays alive (2s grace period)...")
+        time.Sleep(2 * time.Second)
+        if !handler.IsRunning() {
+                log.Printf("[manager] subprocess died during grace period")
+                handler.Stop()
+                cancel()
+                m.setState(StateError)
+                m.emit(ConnectionEvent{
+                        State: StateError,
+                        Error: fmt.Sprintf("protocol process exited immediately (check logs for config errors)"),
+                        Time:  time.Now(),
+                })
+                return fmt.Errorf("protocol process exited immediately (check logs for config errors)")
+        }
+        log.Printf("[manager] subprocess is alive after grace period")
+
         // Setup TUN and routing
         if m.tunnel != nil {
                 if err := m.tunnel.Setup(socksPort, httpPort, server); err != nil {

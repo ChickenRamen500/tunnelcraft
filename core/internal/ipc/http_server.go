@@ -241,12 +241,13 @@ func (h *HTTPServer) handleConnect(w http.ResponseWriter, req *http.Request) {
                 return
         }
 
-        cfg := h.cfg.Get()
-        h.json(w, http.StatusOK, map[string]interface{}{
-                "state":     "CONNECTING",
+        // Connect is asynchronous — the manager handles state transitions internally.
+        // Return 202 Accepted so the frontend knows the request was accepted.
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusAccepted)
+        json.NewEncoder(w).Encode(map[string]interface{}{
+                "status":    "accepted",
                 "server_id": body.ServerID,
-                "socks_port": cfg.Tunnel.SOCKSPort,
-                "http_port":  cfg.Tunnel.HTTPPort,
         })
 }
 

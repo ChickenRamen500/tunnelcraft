@@ -162,22 +162,45 @@ func (u *Updater) calculateTicker() *time.Ticker {
 }
 
 // replaceSubscriptionServers updates the config with new servers from a subscription.
+// It matches existing servers by ID (stable/deterministic) to preserve user
+// settings like favorite and sort_order.  New servers are appended, removed
+// servers are deleted.
 func (u *Updater) replaceSubscriptionServers(subscriptionID string, newServers []engine.ServerConfig) {
         u.cfg.Update(func(c *config.Config) {
-                // Remove old servers from this subscription
-                var filtered []config.ServerEntry
-                for _, s := range c.Servers {
-                        if s.SubscriptionID != subscriptionID {
-                                filtered = append(filtered, s)
+                // Build a lookup of existing servers for this subscription by ID.
+                existing := make(map[string]*config.ServerEntry)
+                var other []config.ServerEntry // servers from OTHER subscriptions
+                for i := range c.Servers {
+                        s := &c.Servers[i]
+                        if s.SubscriptionID == subscriptionID {
+                                existing[s.ID] = s
+                        } else {
+                                other = append(other, *s)
                         }
                 }
-                c.Servers = filtered
 
-                // Add new servers
+                // Build the new server list.
+                var updated []config.ServerEntry
+                updated = append(updated, other...)
+
+                seen := make(map[string]bool)
                 for _, srv := range newServers {
                         entry := serverConfigToEntry(srv)
-                        c.Servers = append(c.Servers, entry)
+                        seen[entry.ID] = true
+
+                        // Preserve user settings if this server existed before.
+                        if old, ok := existing[entry.ID]; ok {
+                                entry.Favorite = old.Favorite
+                                entry.SortOrder = old.SortOrder
+                                entry.Tags = old.Tags
+                        }
+
+                        updated = append(updated, entry)
                 }
+
+                // Remove old servers that no longer exist in the subscription.
+                // (already handled by rebuilding the list without them)
+                c.Servers = updated
         })
 
         log.Printf("[subscription] updated %d servers for subscription %s", len(newServers), subscriptionID)

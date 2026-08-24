@@ -47,10 +47,13 @@ func DetectFormat(rawContent []byte) string {
         if err == nil {
                 decodedStr := strings.TrimSpace(string(decoded))
 
-                // Decoded content is JSON – check SIP008 first (more specific), then sing-box.
+                // Decoded content is JSON – check SIP008, then xray, then sing-box.
                 if isJSON(decodedStr) {
                         if isSIP008JSON(decoded) {
                                 return "sip008"
+                        }
+                        if isXrayJSON(decoded) {
+                                return "xray"
                         }
                         if isSingBoxJSON(decoded) {
                                 return "singbox"
@@ -79,6 +82,9 @@ func DetectFormat(rawContent []byte) string {
         if isJSON(trimmed) {
                 if isSIP008JSON(rawContent) {
                         return "sip008"
+                }
+                if isXrayJSON(rawContent) {
+                        return "xray"
                 }
                 if isSingBoxJSON(rawContent) {
                         return "singbox"
@@ -132,6 +138,7 @@ func Parse(rawContent []byte) ([]engine.ServerConfig, []ParseError) {
                 if err != nil {
                         return servers, append(errs, ParseError{Message: err.Error()})
                 }
+                computeStableID(&cfg)
                 return append(servers, cfg), errs
         }
 
@@ -142,6 +149,9 @@ func Parse(rawContent []byte) ([]engine.ServerConfig, []ParseError) {
         if isJSON(payloadStr) {
                 if isSIP008JSON(payload) {
                         return parseSIP008(payload)
+                }
+                if isXrayJSON(payload) {
+                        return parseXrayJSON(payload)
                 }
                 if isSingBoxJSON(payload) {
                         return parseSingBox(payload)
@@ -170,6 +180,7 @@ func Parse(rawContent []byte) ([]engine.ServerConfig, []ParseError) {
                         errs = append(errs, ParseError{Line: i + 1, Message: err.Error()})
                         continue
                 }
+                computeStableID(&s)
                 servers = append(servers, s)
         }
 
@@ -1045,9 +1056,7 @@ func parseSingBox(data []byte) ([]engine.ServerConfig, []ParseError) {
                 if cfg.Name == "" {
                         cfg.Name = meta.Tag
                 }
-                if cfg.ID == "" {
-                        cfg.ID = uuid.New().String()
-                }
+                computeStableID(&cfg)
 
                 servers = append(servers, cfg)
         }
@@ -1394,10 +1403,350 @@ func parseSIP008(data []byte) ([]engine.ServerConfig, []ParseError) {
                         cfg.Security = "tls"
                 }
 
+                computeStableID(&cfg)
                 servers = append(servers, cfg)
         }
 
         return servers, errs
+}
+
+// ---------------------------------------------------------------------------
+// Xray JSON subscription parser
+// ---------------------------------------------------------------------------
+
+// xrayConfig represents the top-level xray config JSON.
+// Some subscription providers return a single xray config or an array of them.
+type xrayConfig struct {
+        Outbounds []json.RawMessage `json:"outbounds"`
+        Remarks   string            `json:"remarks"`
+}
+
+// xrayOutbound represents the minimal fields needed from an xray outbound.
+type xrayOutbound struct {
+        Tag           string          `json:"tag"`
+        Protocol      string          `json:"protocol"`
+        Settings      json.RawMessage `json:"settings"`
+        StreamSettings json.RawMessage `json:"streamSettings"`
+}
+
+// xrayVNext is the vnext array inside vless/vmess settings.
+type xrayVNext struct {
+        Address string `json:"address"`
+        Port    uint32 `json:"port"`
+        Users   []struct {
+                ID         string `json:"id"`
+                Encryption string `json:"encryption"`
+                Security   string `json:"security"`
+                Flow       string `json:"flow"`
+                Level      int    `json:"level"`
+        } `json:"users"`
+}
+
+// xrayStreamSettings captures stream/transport settings.
+type xrayStreamSettings struct {
+        Network       string          `json:"network"`
+        Security      string          `json:"security"`
+        TLSSettings   *xrayTLSSettings `json:"tlsSettings"`
+        WSSettings    *xrayWSSettings   `json:"wsSettings"`
+        GRPCSettings  *xrayGRPCSettings `json:"grpcSettings"`
+        KCPSettings   *xrayKCPSettings  `json:"kcpSettings"`
+        XHTTPSettings *xrayXHTTPSettings `json:"xhttpSettings"`
+        // Non-standard: some providers use finalmask for transport overrides.
+        FinalMask     json.RawMessage `json:"finalmask"`
+        // Hysteria-specific xray settings.
+        HysteriaSettings *xrayHysteriaSettings `json:"hysteriaSettings"`
+}
+
+type xrayTLSSettings struct {
+        ServerName  string `json:"serverName"`
+        Fingerprint string `json:"fingerprint"`
+        ALPN        string `json:"alpn"`
+        AllowInsecure bool  `json:"allowInsecure"`
+        // Reality
+        RealitySettings *xrayRealitySettings `json:"realitySettings"`
+        // Show (used by some providers for obfuscation flag)
+        Show bool `json:"show"`
+}
+
+type xrayRealitySettings struct {
+        PublicKey string `json:"publicKey"`
+        ShortId   string `json:"shortId"`
+        Fingerprint string `json:"fingerprint"`
+}
+
+type xrayWSSettings struct {
+        Path string `json:"path"`
+}
+
+type xrayGRPCSettings struct {
+        ServiceName string `json:"serviceName"`
+}
+
+type xrayKCPSettings struct {
+        Seed string `json:"seed"`
+        Header *struct {
+                Type string `json:"type"`
+        } `json:"header"`
+}
+
+type xrayXHTTPSettings struct {
+        Path string `json:"path"`
+        Mode string `json:"mode"`
+}
+
+type xrayHysteriaSettings struct {
+        Auth    string `json:"auth"`
+        Version int    `json:"version"`
+}
+
+// parseXrayJSON parses an xray-format JSON subscription.
+// The input may be a single xray config {"outbounds":[...]} or a JSON array.
+// Only the "proxy" outbound (first vless/vmess/hysteria outbound) is extracted.
+func parseXrayJSON(data []byte) ([]engine.ServerConfig, []ParseError) {
+        // Try as a single config first.
+        var single xrayConfig
+        if err := json.Unmarshal(data, &single); err != nil {
+                // Try as JSON array of configs.
+                var arr []json.RawMessage
+                if err2 := json.Unmarshal(data, &arr); err2 != nil {
+                        return nil, []ParseError{{Message: fmt.Sprintf("xray JSON parse: %v", err)}}
+                }
+                var allServers []engine.ServerConfig
+                var allErrs []ParseError
+                for i, item := range arr {
+                        servers, errs := parseSingleXrayConfig(item)
+                        allServers = append(allServers, servers...)
+                        for _, e := range errs {
+                                e.Line = i + 1
+                                allErrs = append(allErrs, e)
+                        }
+                }
+                return allServers, allErrs
+        }
+        return parseSingleXrayConfig(data)
+}
+
+// parseSingleXrayConfig extracts servers from a single xray config JSON.
+func parseSingleXrayConfig(data []byte) ([]engine.ServerConfig, []ParseError) {
+        var xc xrayConfig
+        if err := json.Unmarshal(data, &xc); err != nil {
+                return nil, []ParseError{{Message: fmt.Sprintf("xray JSON parse: %v", err)}}
+        }
+
+        var servers []engine.ServerConfig
+        var errs []ParseError
+
+        // Get the server name from the "remarks" field if present.
+        baseName := xc.Remarks
+
+        for i, raw := range xc.Outbounds {
+                var meta xrayOutbound
+                if err := json.Unmarshal(raw, &meta); err != nil {
+                        continue
+                }
+
+                cfg, err := parseXrayOutbound(&meta, baseName)
+                if err != nil {
+                        errs = append(errs, ParseError{Line: i + 1, Message: err.Error()})
+                        continue
+                }
+
+                computeStableID(&cfg)
+                servers = append(servers, cfg)
+        }
+
+        return servers, errs
+}
+
+// parseXrayOutbound converts a single xray outbound to ServerConfig.
+func parseXrayOutbound(meta *xrayOutbound, baseName string) (engine.ServerConfig, error) {
+        var cfg engine.ServerConfig
+
+        switch meta.Protocol {
+        case "vless":
+                cfg.Protocol = engine.ProtocolVLESS
+        case "vmess":
+                cfg.Protocol = engine.ProtocolVMESS
+        case "hysteria":
+                // Hysteria v1 or v2 in xray format
+                cfg = parseXrayHysteriaOutbound(meta, baseName)
+                return cfg, nil
+        case "trojan":
+                cfg.Protocol = engine.ProtocolTrojan
+        default:
+                // Skip non-proxy outbounds (freedom, blackhole, etc.)
+                return engine.ServerConfig{}, fmt.Errorf("skipping non-proxy outbound: %s", meta.Protocol)
+        }
+
+        // Parse vnext from settings.
+        var settings struct {
+                VNext []xrayVNext `json:"vnext"`
+                Servers []struct {
+                        Address  string `json:"address"`
+                        Port     uint32 `json:"port"`
+                        Password string `json:"password"`
+                } `json:"servers"`
+        }
+        if err := json.Unmarshal(meta.Settings, &settings); err != nil {
+                return engine.ServerConfig{}, fmt.Errorf("failed to parse settings: %w", err)
+        }
+
+        if len(settings.VNext) > 0 {
+                vn := settings.VNext[0]
+                cfg.Host = vn.Address
+                cfg.Port = vn.Port
+                if len(vn.Users) > 0 {
+                        cfg.UUID = vn.Users[0].ID
+                        cfg.Flow = vn.Users[0].Flow
+                }
+        } else if len(settings.Servers) > 0 {
+                // Trojan uses "servers" instead of "vnext"
+                cfg.Host = settings.Servers[0].Address
+                cfg.Port = settings.Servers[0].Port
+                cfg.TrojanPassword = settings.Servers[0].Password
+        }
+
+        // Parse stream settings.
+        if meta.StreamSettings != nil {
+                var ss xrayStreamSettings
+                if err := json.Unmarshal(meta.StreamSettings, &ss); err == nil {
+                        cfg.Transport = ss.Network
+                        cfg.Security = ss.Security
+
+                        if ss.TLSSettings != nil {
+                                cfg.SNI = ss.TLSSettings.ServerName
+                                cfg.Fingerprint = ss.TLSSettings.Fingerprint
+                                cfg.ALPN = ss.TLSSettings.ALPN
+                                cfg.AllowInsecure = ss.TLSSettings.AllowInsecure
+                                if ss.TLSSettings.RealitySettings != nil {
+                                        cfg.Security = "reality"
+                                        cfg.PublicKey = ss.TLSSettings.RealitySettings.PublicKey
+                                        cfg.ShortID = ss.TLSSettings.RealitySettings.ShortId
+                                        if ss.TLSSettings.RealitySettings.Fingerprint != "" {
+                                                cfg.Fingerprint = ss.TLSSettings.RealitySettings.Fingerprint
+                                        }
+                                }
+                        }
+
+                        if ss.WSSettings != nil {
+                                cfg.WSPath = ss.WSSettings.Path
+                        }
+                        if ss.GRPCSettings != nil {
+                                cfg.GRPCService = ss.GRPCSettings.ServiceName
+                        }
+                        if ss.KCPSettings != nil {
+                                cfg.KCPSeed = ss.KCPSettings.Seed
+                        }
+                        if ss.XHTTPSettings != nil {
+                                cfg.XHTTPPath = ss.XHTTPSettings.Path
+                                cfg.XHTTPMode = ss.XHTTPSettings.Mode
+                        }
+
+                        // Non-standard: finalmask can override transport settings.
+                        if ss.FinalMask != nil {
+                                parseFinalMask(ss.FinalMask, &cfg)
+                        }
+                }
+        }
+
+        // Name: prefer tag, then baseName.
+        if meta.Tag != "" && meta.Tag != "proxy" {
+                cfg.Name = meta.Tag
+        } else if baseName != "" {
+                cfg.Name = baseName
+        } else {
+                cfg.Name = fmt.Sprintf("%s://%s:%d", cfg.Protocol, cfg.Host, cfg.Port)
+        }
+
+        return cfg, nil
+}
+
+// parseXrayHysteriaOutbound handles hysteria protocol in xray format.
+func parseXrayHysteriaOutbound(meta *xrayOutbound, baseName string) engine.ServerConfig {
+        var cfg engine.ServerConfig
+
+        // Parse settings for address/port.
+        var settings struct {
+                Address string `json:"address"`
+                Port    uint32 `json:"port"`
+                Version int    `json:"version"`
+        }
+        _ = json.Unmarshal(meta.Settings, &settings)
+
+        cfg.Host = settings.Address
+        cfg.Port = settings.Port
+
+        if settings.Version >= 2 {
+                cfg.Protocol = engine.ProtocolHysteria2
+        } else {
+                cfg.Protocol = engine.ProtocolHysteria
+        }
+
+        // Parse stream settings for TLS/SNI and hysteria auth.
+        if meta.StreamSettings != nil {
+                var ss xrayStreamSettings
+                if err := json.Unmarshal(meta.StreamSettings, &ss); err == nil {
+                        if ss.TLSSettings != nil {
+                                cfg.HysteriaSNI = ss.TLSSettings.ServerName
+                                cfg.HysteriaALPN = ss.TLSSettings.ALPN
+                                cfg.HysteriaInsecure = ss.TLSSettings.AllowInsecure
+                        }
+                        if ss.HysteriaSettings != nil {
+                                cfg.HysteriaAuth = ss.HysteriaSettings.Auth
+                        }
+                        // Non-standard: finalmask for congestion control, etc.
+                        if ss.FinalMask != nil {
+                                parseFinalMask(ss.FinalMask, &cfg)
+                        }
+                }
+        }
+
+        // Name.
+        if meta.Tag != "" && meta.Tag != "proxy" {
+                cfg.Name = meta.Tag
+        } else if baseName != "" {
+                cfg.Name = baseName
+        } else {
+                cfg.Name = fmt.Sprintf("%s://%s:%d", cfg.Protocol, cfg.Host, cfg.Port)
+        }
+
+        return cfg
+}
+
+// parseFinalMask handles non-standard xray extensions in the "finalmask" field.
+// Some providers use this for transport overrides and congestion control.
+func parseFinalMask(raw json.RawMessage, cfg *engine.ServerConfig) {
+        var fm map[string]json.RawMessage
+        if err := json.Unmarshal(raw, &fm); err != nil {
+                return
+        }
+
+        // Check for QUIC/congestion settings (hysteria).
+        if quic, ok := fm["quicParams"]; ok {
+                var qp struct {
+                        Congestion string `json:"congestion"`
+                }
+                if json.Unmarshal(quic, &qp) == nil && qp.Congestion == "brutal" {
+                        // Hysteria2 with brutal congestion — bandwidth may be needed.
+                        // The actual bandwidth values come from the hysteria settings or query params.
+                        _ = qp.Congestion // acknowledge for future use
+                }
+        }
+
+        // Check for UDP/transport overrides (e.g., mkcp-legacy).
+        if udp, ok := fm["udp"]; ok {
+                var udpArr []struct {
+                        Type     string `json:"type"`
+                        Settings struct {
+                                Header string `json:"header"`
+                        } `json:"settings"`
+                }
+                if json.Unmarshal(udp, &udpArr) == nil && len(udpArr) > 0 {
+                        if udpArr[0].Type == "mkcp-legacy" || strings.Contains(udpArr[0].Type, "mkcp") {
+                                cfg.Transport = "kcp"
+                        }
+                }
+        }
 }
 
 // ---------------------------------------------------------------------------
@@ -1518,7 +1867,7 @@ func parseClash(data []byte) ([]engine.ServerConfig, []ParseError) {
                         errs = append(errs, ParseError{Line: i + 1, Message: err.Error()})
                         continue
                 }
-
+                computeStableID(&cfg)
                 servers = append(servers, cfg)
         }
 
@@ -1730,9 +2079,31 @@ func isJSON(s string) bool {
 }
 
 // isSingBoxJSON checks for sing-box-specific JSON keys.
-// A sing-box config must contain "outbounds".
+// A sing-box outbound must have "type" (not "protocol").
 func isSingBoxJSON(data []byte) bool {
-        return strings.Contains(string(data), `"outbounds"`)
+        s := string(data)
+        if !strings.Contains(s, `"outbounds"`) {
+                return false
+        }
+        // sing-box outbounds use "type": "vless", xray uses "protocol": "vless".
+        // If we see "type" alongside "outbounds", it's likely sing-box.
+        // If we see "protocol" alongside "outbounds" but NOT "type", it's xray.
+        hasType := strings.Contains(s, `"type"`)
+        hasProtocol := strings.Contains(s, `"protocol"`)
+        if hasProtocol && !hasType {
+                return false // xray format, not sing-box
+        }
+        return hasType
+}
+
+// isXrayJSON checks for xray-format JSON (outbounds with "protocol" key).
+func isXrayJSON(data []byte) bool {
+        s := string(data)
+        if !strings.Contains(s, `"outbounds"`) {
+                return false
+        }
+        // xray outbounds use "protocol": "vless" etc.
+        return strings.Contains(s, `"protocol"`)
 }
 
 // isSIP008JSON checks for SIP008-specific JSON keys.
@@ -1768,7 +2139,7 @@ func hasShareLinkPrefix(s string) bool {
                         strings.HasPrefix(line, "ss://"),
                         strings.HasPrefix(line, "hysteria2://"),
                         strings.HasPrefix(line, "hy2://"),
-				strings.HasPrefix(line, "hysteria://"),
+                                strings.HasPrefix(line, "hysteria://"),
                         strings.HasPrefix(line, "wg://"),
                         strings.HasPrefix(line, "awg://"):
                         return true
@@ -1907,4 +2278,36 @@ func truncate(s string, n int) string {
                 return s
         }
         return s[:n] + "..."
+}
+
+// ---------------------------------------------------------------------------
+// Deterministic (stable) server ID generation
+// ---------------------------------------------------------------------------
+
+// idNamespace is a fixed UUID namespace used for generating stable IDs.
+// Using UUID v5 guarantees the same input always produces the same ID.
+var idNamespace = uuid.MustParse("6ba7b810-9dad-11d1-80b4-00c04fd430c8") // URL namespace
+
+// computeStableID overwrites cfg.ID with a deterministic UUID v5 derived from
+// the server's unique identifying properties.  The same logical server always
+// gets the same ID across restarts and subscription refreshes.
+func computeStableID(cfg *engine.ServerConfig) {
+        // Build a unique key from the server's identifying properties.
+        // Name is intentionally excluded (providers rename servers).
+        key := fmt.Sprintf("%s|%d|%s", strings.ToLower(cfg.Host), cfg.Port, cfg.Protocol)
+        // Add protocol-specific auth credential to distinguish servers
+        // that share the same host:port (rare but possible with different users).
+        switch cfg.Protocol {
+        case engine.ProtocolVLESS, engine.ProtocolVMESS:
+                key += "|" + cfg.UUID
+        case engine.ProtocolHysteria, engine.ProtocolHysteria2:
+                key += "|" + cfg.HysteriaAuth
+        case engine.ProtocolTrojan:
+                key += "|" + cfg.TrojanPassword
+        case engine.ProtocolWireGuard:
+                key += "|" + cfg.WGPublicKey
+        case engine.ProtocolAmneziaWG:
+                key += "|" + cfg.AmneziaPublicKey
+        }
+        cfg.ID = uuid.NewSHA1(idNamespace, []byte(key)).String()
 }
