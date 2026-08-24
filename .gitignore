@@ -6,3 +6,5 @@ bin/tunnelcraftd.exe
 bin/.gitkeep
 bin/data/config.yaml
 package-lock.json
+.github-token
+/TunnelCraft-Portable
