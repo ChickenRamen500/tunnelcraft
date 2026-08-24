@@ -91,16 +91,24 @@ if not exist "node_modules" (
     )
 )
 
-echo       Running tauri build (compiling Rust release + frontend)...
+echo       Compiling frontend + Rust release...
 call npm run tauri build
-if %ERRORLEVEL% neq 0 (
-    color 0C
-    echo [ERROR] Tauri build failed!
-    popd
-    goto :fail
+set "TAURI_BUILD_ERR=%ERRORLEVEL%"
+if %TAURI_BUILD_ERR% neq 0 (
+    echo [WARN] Tauri bundle step failed (MSI/NSIS installer not created).
+    echo [INFO] Checking if the exe was still built...
+    if exist "src-tauri\target\release\tunnelcraft-ui.exe" (
+        echo [OK] tunnelcraft-ui.exe exists, continuing with portable build.
+    ) else (
+        color 0C
+        echo [ERROR] Tauri exe not found. Build failed completely.
+        popd
+        goto :fail
+    )
+) else (
+    echo [OK] Tauri release built successfully.
 )
 popd
-echo [OK] Tauri release built.
 echo.
 
 echo [5/6] Creating portable distribution...
@@ -189,9 +197,11 @@ echo   NOTE: The target PC needs WebView2 Runtime.
 echo   If not installed, the app will auto-download it.
 echo ============================================================
 echo.
-echo Installers (if you prefer) are in:
-echo   ui\src-tauri\target\release\bundle\
-echo.
+if exist "ui\src-tauri\target\release\bundle" (
+    echo Installers (if you prefer) are in:
+    echo   ui\src-tauri\target\release\bundle\
+    echo.
+)
 goto :end
 
 :fail
