@@ -4,6 +4,8 @@ import (
         "context"
         "fmt"
         "log"
+        "os"
+        "path/filepath"
         "sync"
         "time"
 
@@ -11,6 +13,12 @@ import (
         protos "github.com/ChickenRamen500/tunnelcraft/core/internal/proto"
         "google.golang.org/grpc"
 )
+
+// RoutingRuleSetter is implemented by protocol handlers that accept custom routing rules.
+// This avoids importing the protocols package from engine (which would create a cycle).
+type RoutingRuleSetter interface {
+        SetRoutingRules(rules []config.RoutingRule)
+}
 
 // Manager orchestrates the full VPN connection lifecycle.
 // It selects the protocol, starts the subprocess, manages TUN,
@@ -27,6 +35,8 @@ type Manager struct {
         tunnel        TunnelController
         healthChecker *HealthChecker
         protoHandlers map[Protocol]ProtocolHandler
+        bridgeHandler ProtocolHandler // lazy-created bridge handler
+        bridgeFactory func(xrayPath, singboxPath string) ProtocolHandler // set by daemon during init
 }
 
 // ProtocolHandler is the interface each protocol wrapper must implement.
@@ -135,8 +145,8 @@ func (m *Manager) Connect(ctx context.Context, serverID string) error {
         httpPort := cfg.Tunnel.HTTPPort
 
         // Create protocol handler
-        log.Printf("[manager] Creating handler for protocol %v", server.Protocol)
-        handler, err := m.createHandler(server.Protocol)
+        log.Printf("[manager] Creating handler for protocol %v (transport=%s)", server.Protocol, server.Transport)
+        handler, err := m.createHandler(server)
         if err != nil {
                 log.Printf("[manager] Failed to create handler: %v", err)
                 cancel()
@@ -150,6 +160,11 @@ func (m *Manager) Connect(ctx context.Context, serverID string) error {
         }
         m.proto = handler
         log.Printf("[manager] Handler created: %v", handler.Name())
+
+        // Inject routing rules into handlers that support split tunneling
+        if rr, ok := handler.(RoutingRuleSetter); ok {
+                rr.SetRoutingRules(m.cfg.Get().Routing.Rules)
+        }
 
         // Start protocol subprocess
         log.Printf("[manager] About to call handler.Start()")
@@ -330,13 +345,63 @@ func (m *Manager) findServer(id string) *ServerConfig {
 }
 
 // createHandler dispatches to the correct protocol wrapper.
-func (m *Manager) createHandler(p Protocol) (ProtocolHandler, error) {
+// For VLESS/VMESS with XHTTP or KCP transport, it returns a BridgeHandler
+// that chains xray-core (for the transport) + sing-box (for TUN).
+func (m *Manager) createHandler(server *ServerConfig) (ProtocolHandler, error) {
+        // Check if bridge mode is needed (XHTTP or KCP transport)
+        if server.Transport == "xhttp" || server.Transport == "kcp" {
+                log.Printf("[manager] transport=%s requires bridge mode (xray + sing-box)", server.Transport)
+                return m.getBridgeHandler(), nil
+        }
+
+        // Standard dispatch to registered protocol handler
         if m.protoHandlers != nil {
-                if h, ok := m.protoHandlers[p]; ok {
+                if h, ok := m.protoHandlers[server.Protocol]; ok {
                         return h, nil
                 }
         }
-        return nil, fmt.Errorf("protocol %s: no handler registered", p)
+        return nil, fmt.Errorf("protocol %s: no handler registered", server.Protocol)
+}
+
+// SetBridgeFactory sets the factory function for creating bridge handlers.
+// This must be called by the daemon during initialization to avoid
+// an import cycle between engine and protocols packages.
+func (m *Manager) SetBridgeFactory(factory func(xrayPath, singboxPath string) ProtocolHandler) {
+        m.mu.Lock()
+        defer m.mu.Unlock()
+        m.bridgeFactory = factory
+}
+
+// getBridgeHandler lazily creates a BridgeHandler using binary paths from config.
+func (m *Manager) getBridgeHandler() ProtocolHandler {
+        m.mu.Lock()
+        defer m.mu.Unlock()
+        if m.bridgeHandler != nil {
+                return m.bridgeHandler
+        }
+
+        if m.bridgeFactory == nil {
+                log.Println("[manager] ERROR: bridge factory not set, cannot create bridge handler")
+                return nil
+        }
+
+        cfg := m.cfg.Get()
+        binDir := cfg.Daemon.BinDir
+
+        xrayPath := filepath.Join(binDir, "xray-core.exe")
+        singboxPath := filepath.Join(binDir, "sing-box.exe")
+
+        // Allow override via env vars (useful for dev/debug)
+        if v := os.Getenv("TUNNELCRAFT_XRAY_PATH"); v != "" {
+                xrayPath = v
+        }
+        if v := os.Getenv("TUNNELCRAFT_SINGBOX_PATH"); v != "" {
+                singboxPath = v
+        }
+
+        m.bridgeHandler = m.bridgeFactory(xrayPath, singboxPath)
+        log.Printf("[manager] bridge handler created (xray=%s, singbox=%s)", xrayPath, singboxPath)
+        return m.bridgeHandler
 }
 
 func (m *Manager) monitorHealth(ctx context.Context, server *ServerConfig) {

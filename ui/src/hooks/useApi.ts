@@ -183,10 +183,30 @@ export async function saveSettings(settings: Partial<Settings>): Promise<void> {
 
 export async function getRoutingRules(): Promise<any> {
   try {
-    return await api("/api/settings");
+    return await api("/api/routing");
   } catch {
     return { domain_strategy: "IPIfNonMatch", rules: [] };
   }
+}
+
+export async function createRoutingRule(rule: Partial<RoutingRule>): Promise<{ id: string; status: string }> {
+  return api("/api/routing/rules", {
+    method: "POST",
+    body: JSON.stringify(rule),
+  });
+}
+
+export async function updateRoutingRule(rule: RoutingRule): Promise<{ status: string }> {
+  return api("/api/routing/rules", {
+    method: "PUT",
+    body: JSON.stringify(rule),
+  });
+}
+
+export async function deleteRoutingRule(id: string): Promise<{ status: string }> {
+  return api(`/api/routing/rules?id=${id}`, {
+    method: "DELETE",
+  });
 }
 
 export async function getLogs(limit = 100): Promise<{ logs: string[]; count: number }> {

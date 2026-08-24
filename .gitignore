@@ -1,0 +1,32 @@
+# Binaries
+bin/*.exe
+bin/*.dll
+bin/wintun.dll
+
+# Dependencies
+ui/node_modules/
+
+# Build output
+ui/dist/
+
+# Download/output
+download/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+
+# Tool results
+tool-results/
+
+# Test files
+test.go
+ai_agent_test
