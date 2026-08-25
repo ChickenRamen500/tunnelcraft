@@ -66,25 +66,7 @@ func (x *XrayHandler) generateConfig(server *engine.ServerConfig, socksPort, htt
                 "log": map[string]interface{}{
                         "loglevel": "warning",
                 },
-                "inbounds": []interface{}{
-                        map[string]interface{}{
-                                "tag":     "tunnelcraft-socks",
-                                "port":    socksPort,
-                                "listen":  "127.0.0.1",
-                                "protocol": "socks",
-                                "settings": map[string]interface{}{
-                                        "auth": "noauth",
-                                        "udp":  true,
-                                },
-                        },
-                        map[string]interface{}{
-                                "tag":     "tunnelcraft-http",
-                                "port":    httpPort,
-                                "listen":  "127.0.0.1",
-                                "protocol": "http",
-                                "settings": map[string]interface{}{},
-                        },
-                },
+                "inbounds": x.buildInbounds(socksPort, httpPort),
                 "outbounds": []interface{}{
                         x.buildOutbound(xrayProtocol, server),
                         map[string]interface{}{
@@ -114,6 +96,33 @@ func (x *XrayHandler) generateConfig(server *engine.ServerConfig, socksPort, htt
         }
 
         return configPath, nil
+}
+
+// buildInbounds constructs the inbound list.
+// When httpPort is 0 (e.g. bridge mode), the HTTP inbound is omitted.
+func (x *XrayHandler) buildInbounds(socksPort, httpPort uint32) []interface{} {
+        inbounds := []interface{}{
+                map[string]interface{}{
+                        "tag":      "tunnelcraft-socks",
+                        "port":     socksPort,
+                        "listen":   "127.0.0.1",
+                        "protocol": "socks",
+                        "settings": map[string]interface{}{
+                                "auth": "noauth",
+                                "udp":  true,
+                        },
+                },
+        }
+        if httpPort > 0 {
+                inbounds = append(inbounds, map[string]interface{}{
+                        "tag":      "tunnelcraft-http",
+                        "port":     httpPort,
+                        "listen":   "127.0.0.1",
+                        "protocol": "http",
+                        "settings": map[string]interface{}{},
+                })
+        }
+        return inbounds
 }
 
 // buildOutbound constructs the xray outbound configuration.

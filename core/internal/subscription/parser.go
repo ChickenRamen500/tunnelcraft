@@ -162,8 +162,9 @@ func Parse(rawContent []byte) ([]engine.ServerConfig, []ParseError) {
                 }
                 // Try V2Board/Marzban-style JSON: {"links": [...]} or
                 // {"data": "base64..."} subscription response.
-                if links, ok := parseProviderJSONLinks(payload); ok {
-                        return links
+                links, parseErrs := parseProviderJSONLinks(payload)
+                if links != nil {
+                        return links, parseErrs
                 }
                 // Unknown JSON format.
                 return servers, append(errs, ParseError{Message: "unrecognised JSON format"})
@@ -1457,15 +1458,16 @@ type xrayVNext struct {
 
 // xrayStreamSettings captures stream/transport settings.
 type xrayStreamSettings struct {
-        Network       string          `json:"network"`
-        Security      string          `json:"security"`
-        TLSSettings   *xrayTLSSettings `json:"tlsSettings"`
-        WSSettings    *xrayWSSettings   `json:"wsSettings"`
-        GRPCSettings  *xrayGRPCSettings `json:"grpcSettings"`
-        KCPSettings   *xrayKCPSettings  `json:"kcpSettings"`
-        XHTTPSettings *xrayXHTTPSettings `json:"xhttpSettings"`
+        Network         string               `json:"network"`
+        Security        string               `json:"security"`
+        TLSSettings     *xrayTLSSettings     `json:"tlsSettings"`
+        RealitySettings *xrayRealitySettings `json:"realitySettings"`
+        WSSettings      *xrayWSSettings      `json:"wsSettings"`
+        GRPCSettings    *xrayGRPCSettings    `json:"grpcSettings"`
+        KCPSettings     *xrayKCPSettings     `json:"kcpSettings"`
+        XHTTPSettings   *xrayXHTTPSettings   `json:"xhttpSettings"`
         // Non-standard: some providers use finalmask for transport overrides.
-        FinalMask     json.RawMessage `json:"finalmask"`
+        FinalMask       json.RawMessage `json:"finalmask"`
         // Hysteria-specific xray settings.
         HysteriaSettings *xrayHysteriaSettings `json:"hysteriaSettings"`
 }
@@ -1626,15 +1628,34 @@ func parseXrayOutbound(meta *xrayOutbound, baseName string) (engine.ServerConfig
                         cfg.Transport = ss.Network
                         cfg.Security = ss.Security
 
+                        // Check REALITY at streamSettings level (standard xray format).
+                        // In real xray configs, realitySettings is a sibling of tlsSettings,
+                        // NOT nested inside it.
+                        if ss.RealitySettings != nil {
+                                cfg.Security = "reality"
+                                cfg.PublicKey = ss.RealitySettings.PublicKey
+                                cfg.ShortID = ss.RealitySettings.ShortId
+                                if ss.RealitySettings.Fingerprint != "" {
+                                        cfg.Fingerprint = ss.RealitySettings.Fingerprint
+                                }
+                        }
+
                         if ss.TLSSettings != nil {
                                 cfg.SNI = ss.TLSSettings.ServerName
-                                cfg.Fingerprint = ss.TLSSettings.Fingerprint
+                                if cfg.Fingerprint == "" {
+                                        cfg.Fingerprint = ss.TLSSettings.Fingerprint
+                                }
                                 cfg.ALPN = ss.TLSSettings.ALPN
                                 cfg.AllowInsecure = ss.TLSSettings.AllowInsecure
+                                // Also handle legacy/alternate placement inside tlsSettings.
                                 if ss.TLSSettings.RealitySettings != nil {
                                         cfg.Security = "reality"
-                                        cfg.PublicKey = ss.TLSSettings.RealitySettings.PublicKey
-                                        cfg.ShortID = ss.TLSSettings.RealitySettings.ShortId
+                                        if cfg.PublicKey == "" {
+                                                cfg.PublicKey = ss.TLSSettings.RealitySettings.PublicKey
+                                        }
+                                        if cfg.ShortID == "" {
+                                                cfg.ShortID = ss.TLSSettings.RealitySettings.ShortId
+                                        }
                                         if ss.TLSSettings.RealitySettings.Fingerprint != "" {
                                                 cfg.Fingerprint = ss.TLSSettings.RealitySettings.Fingerprint
                                         }

@@ -222,7 +222,7 @@ func (s *SingBoxHandler) generateBridgeConfig(server *engine.ServerConfig, bridg
                         "timestamp": true,
                         "output":    "",
                 },
-                "dns": s.buildDNS(settings),
+                "dns": s.buildDNS(settings, "proxy-bridge", server),
                 "inbounds": []map[string]interface{}{
                         {
                                 "type":                      "tun",

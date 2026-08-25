@@ -67,7 +67,7 @@ func (s *SingBoxHandler) generateConfig(server *engine.ServerConfig, tunMode boo
                         "timestamp":  true,
                         "output":     "",
                 },
-                "dns":       s.buildDNS(settings),
+                "dns":       s.buildDNS(settings, "proxy-main", server),
                 "inbounds":  s.buildInbounds(tunMode, localProxyPort),
                 "outbounds": s.buildOutbounds(server),
                 "route":     s.buildRoute(settings, server),
@@ -410,57 +410,74 @@ func (s *SingBoxHandler) buildTransport(server *engine.ServerConfig) map[string]
 }
 
 // buildDNS creates DNS configuration.
-func (s *SingBoxHandler) buildDNS(settings *protos.Settings) map[string]interface{} {
+// proxyTag is the tag of the proxy outbound ("proxy-main" or "proxy-bridge").
+// server is the VPN server config, used to add a DNS rule for the server's domain
+// so it resolves via dns-local (direct) to avoid circular dependency.
+func (s *SingBoxHandler) buildDNS(settings *protos.Settings, proxyTag string, server *engine.ServerConfig) map[string]interface{} {
         dnsServers := []map[string]interface{}{
                 {
-                        "tag":      "dns-remote",
-                        "address":  "https://1.1.1.1/dns-query",
+                        "tag":             "dns-remote",
+                        "address":          "https://1.1.1.1/dns-query",
                         "address_resolver": "dns-local",
+                        "detour":           proxyTag,
                 },
                 {
-                        "tag":     "dns-local",
+                        "tag":    "dns-local",
                         "address": "local",
-                        "detour":  "direct",
+                        "detour": "direct",
                 },
                 {
-                        "tag":     "dns-block",
+                        "tag":    "dns-block",
                         "address": "rcode://success",
                 },
         }
+
+        // DNS rules
+        dnsRules := []map[string]interface{}{}
+
+        // If the server host is a domain (not IP), resolve it via dns-local (direct)
+        // to avoid circular dependency: proxy needs DNS → dns-remote → proxy.
+        if server != nil && server.Host != "" && net.ParseIP(server.Host) == nil {
+                dnsRules = append(dnsRules, map[string]interface{}{
+                        "domain": server.Host,
+                        "server": "dns-local",
+                })
+        }
+
+        // Default: all other queries via dns-remote (through the tunnel).
+        dnsRules = append(dnsRules, map[string]interface{}{
+                "outbound": "any",
+                "server":   "dns-remote",
+        })
 
         // If dns_chain is enabled, add configured providers
         if settings != nil && settings.DnsChain != nil && settings.DnsChain.Enabled {
                 for _, p := range settings.DnsChain.Doh {
                         dnsServers = append(dnsServers, map[string]interface{}{
-                                "tag":     p.Name,
+                                "tag":    p.Name,
                                 "address": p.Addr,
-                                "detour":  "proxy-main",
+                                "detour": proxyTag,
                         })
                 }
                 for _, p := range settings.DnsChain.Dot {
                         dnsServers = append(dnsServers, map[string]interface{}{
-                                "tag":     p.Name,
+                                "tag":    p.Name,
                                 "address": p.Addr,
-                                "detour":  "proxy-main",
+                                "detour": proxyTag,
                         })
                 }
                 for _, p := range settings.DnsChain.Plain {
                         dnsServers = append(dnsServers, map[string]interface{}{
-                                "tag":     p.Name,
+                                "tag":    p.Name,
                                 "address": p.Addr,
-                                "detour":  "direct",
+                                "detour": "direct",
                         })
                 }
         }
 
         return map[string]interface{}{
                 "servers": dnsServers,
-                "rules": []map[string]interface{}{
-                        {
-                                "outbound": "any",
-                                "server":   "dns-remote",
-                        },
-                },
+                "rules":   dnsRules,
         }
 }
 
