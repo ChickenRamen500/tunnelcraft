@@ -2079,21 +2079,24 @@ func base64DecodeAny(s string) ([]byte, error) {
         }
 
         for _, candidate := range candidates {
-                // Try with padding.
-                if m := len(candidate) % 4; m != 0 {
-                        padded := candidate + strings.Repeat("=", 4-m)
-                        if b, err := base64.StdEncoding.DecodeString(padded); err == nil {
-                                return b, nil
-                        }
-                        if b, err := base64.URLEncoding.DecodeString(padded); err == nil {
-                                return b, nil
-                        }
+                // Normalise: strip any existing padding so we always control it.
+                raw := strings.TrimRight(candidate, "=")
+                // Add correct padding and try both standard and URL-safe.
+                padded := raw
+                if m := len(padded) % 4; m != 0 {
+                        padded += strings.Repeat("=", 4-m)
                 }
-                // Raw variants.
-                if b, err := base64.RawStdEncoding.DecodeString(candidate); err == nil {
+                if b, err := base64.StdEncoding.DecodeString(padded); err == nil {
                         return b, nil
                 }
-                if b, err := base64.RawURLEncoding.DecodeString(candidate); err == nil {
+                if b, err := base64.URLEncoding.DecodeString(padded); err == nil {
+                        return b, nil
+                }
+                // Also try raw variants (no padding at all).
+                if b, err := base64.RawStdEncoding.DecodeString(raw); err == nil {
+                        return b, nil
+                }
+                if b, err := base64.RawURLEncoding.DecodeString(raw); err == nil {
                         return b, nil
                 }
         }
@@ -2323,10 +2326,16 @@ var idNamespace = uuid.MustParse("6ba7b810-9dad-11d1-80b4-00c04fd430c8") // URL 
 // computeStableID overwrites cfg.ID with a deterministic UUID v5 derived from
 // the server's unique identifying properties.  The same logical server always
 // gets the same ID across restarts and subscription refreshes.
+//
+// The key includes transport, security, ALPN and flow so that two entries that
+// share host:port:uuid but differ in these fields (e.g. ALPN h3 vs empty)
+// produce distinct IDs instead of colliding.
 func computeStableID(cfg *engine.ServerConfig) {
         // Build a unique key from the server's identifying properties.
         // Name is intentionally excluded (providers rename servers).
-        key := fmt.Sprintf("%s|%d|%s", strings.ToLower(cfg.Host), cfg.Port, cfg.Protocol)
+        key := fmt.Sprintf("%s|%d|%s|%s|%s|%s|%s",
+                strings.ToLower(cfg.Host), cfg.Port, cfg.Protocol,
+                cfg.Transport, cfg.Security, cfg.ALPN, cfg.Flow)
         // Add protocol-specific auth credential to distinguish servers
         // that share the same host:port (rare but possible with different users).
         switch cfg.Protocol {
