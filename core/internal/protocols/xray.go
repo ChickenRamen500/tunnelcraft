@@ -184,15 +184,14 @@ func (x *XrayHandler) buildStreamSettings(server *engine.ServerConfig) map[strin
                         stream["tlsSettings"] = tlsSettings
                         stream["security"] = "tls"
                 } else {
-                        tlsSettings := map[string]interface{}{
+                        // xray-core expects realitySettings at the streamSettings level,
+                        // NOT nested inside tlsSettings.
+                        stream["realitySettings"] = map[string]interface{}{
                                 "serverName": server.SNI,
                                 "fingerprint": server.Fingerprint,
-                                "realitySettings": map[string]interface{}{
-                                        "publicKey": server.PublicKey,
-                                        "shortId":   server.ShortID,
-                                },
+                                "publicKey":  server.PublicKey,
+                                "shortId":    server.ShortID,
                         }
-                        stream["tlsSettings"] = tlsSettings
                 }
         }
 

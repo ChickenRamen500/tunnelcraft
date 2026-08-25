@@ -89,6 +89,10 @@ func DetectFormat(rawContent []byte) string {
                 if isSingBoxJSON(rawContent) {
                         return "singbox"
                 }
+                // Check for V2Board/Marzban provider JSON.
+                if isProviderJSON(rawContent) {
+                        return "provider-json"
+                }
         }
         if isClashYAML(rawContent) {
                 return "clash"
@@ -155,6 +159,11 @@ func Parse(rawContent []byte) ([]engine.ServerConfig, []ParseError) {
                 }
                 if isSingBoxJSON(payload) {
                         return parseSingBox(payload)
+                }
+                // Try V2Board/Marzban-style JSON: {"links": [...]} or
+                // {"data": "base64..."} subscription response.
+                if links, ok := parseProviderJSONLinks(payload); ok {
+                        return links
                 }
                 // Unknown JSON format.
                 return servers, append(errs, ParseError{Message: "unrecognised JSON format"})
@@ -2014,6 +2023,75 @@ func applyClashTransport(p *clashProxy, cfg *engine.ServerConfig) {
 }
 
 // ---------------------------------------------------------------------------
+// Provider JSON (V2Board / Marzban) subscription format
+// ---------------------------------------------------------------------------
+
+// providerSubResp captures the common JSON shape returned by V2Board,
+// Marzban, and similar subscription panels.
+type providerSubResp struct {
+        Links      []string `json:"links"`
+        Data       string   `json:"data"`  // some providers put base64 in "data"
+        Content    string   `json:"content"`
+}
+
+// parseProviderJSONLinks attempts to extract share links from a provider JSON
+// response (V2Board, Marzban, etc.).  It handles two shapes:
+//
+//      1. {"links": ["vless://...", "vmess://..."]}  — array of share links
+//      2. {"data": "base64-encoded-links..."}         — base64 blob in "data"
+//
+// Returns (servers, true) on success, or (nil, false) if the JSON doesn't
+// match either shape.
+func parseProviderJSONLinks(data []byte) ([]engine.ServerConfig, []ParseError) {
+        var resp providerSubResp
+        if err := json.Unmarshal(data, &resp); err != nil {
+                return nil, nil
+        }
+
+        // Determine the source string that contains the share links.
+        var raw string
+        switch {
+        case len(resp.Links) > 0:
+                // Join all links with newlines and parse as share-link list.
+                raw = strings.Join(resp.Links, "\n")
+        case resp.Data != "":
+                raw = resp.Data
+        case resp.Content != "":
+                raw = resp.Content
+        default:
+                return nil, nil // not a provider JSON we recognise
+        }
+
+        // If the raw value looks like base64 (no scheme prefix on first line),
+        // try to decode it first.
+        trimmed := strings.TrimSpace(raw)
+        if !strings.Contains(trimmed, "://") {
+                if decoded, err := tryBase64Decode([]byte(trimmed)); err == nil {
+                        raw = strings.TrimSpace(string(decoded))
+                }
+        }
+
+        // Parse each line as a share link.
+        var servers []engine.ServerConfig
+        var errs []ParseError
+        lines := strings.Split(raw, "\n")
+        for i, line := range lines {
+                line = strings.TrimSpace(line)
+                if line == "" || strings.HasPrefix(line, "#") {
+                        continue
+                }
+                s, err := parseShareLink(line)
+                if err != nil {
+                        errs = append(errs, ParseError{Line: i + 1, Message: err.Error()})
+                        continue
+                }
+                computeStableID(&s)
+                servers = append(servers, s)
+        }
+        return servers, errs
+}
+
+// ---------------------------------------------------------------------------
 // Format detection helpers
 // ---------------------------------------------------------------------------
 
@@ -2141,6 +2219,12 @@ func isXrayJSON(data []byte) bool {
 func isSIP008JSON(data []byte) bool {
         s := string(data)
         return strings.Contains(s, `"version"`) && strings.Contains(s, `"servers"`)
+}
+
+// isProviderJSON checks for V2Board/Marzban-style JSON subscription responses
+// that contain a "links" array (the most reliable indicator).
+func isProviderJSON(data []byte) bool {
+        return strings.Contains(string(data), `"links"`)
 }
 
 // isClashYAML checks for Clash-specific YAML keys.

@@ -128,8 +128,10 @@ func (p *Provider) fetchContent(ctx context.Context, rawURL, username, password 
                 return nil, fmt.Errorf("invalid URL: %w", err)
         }
 
-        // Add User-Agent header (some providers block default UA)
-        req.Header.Set("User-Agent", "TunnelCraft/0.1.0")
+        // Add User-Agent header (some providers block default UA or return
+        // JSON metadata instead of base64 links for unknown clients).
+        // Using a V2Ray-compatible UA ensures we get the share-link format.
+        req.Header.Set("User-Agent", "V2RayN/6.0")
 
         // Add Basic Auth if credentials provided
         if username != "" {
