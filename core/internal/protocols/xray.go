@@ -4,6 +4,7 @@ import (
         "context"
         "encoding/json"
         "fmt"
+        "net"
         "os"
         "path/filepath"
         "strings"
@@ -61,14 +62,43 @@ func (x *XrayHandler) generateConfig(server *engine.ServerConfig, socksPort, htt
                 return "", fmt.Errorf("unsupported xray protocol: %s", server.Protocol)
         }
 
-        // Build the config
+        // Build the config.
+        // When running in bridge mode, sing-box TUN captures all system traffic including DNS.
+        // xray uses Go's net.Dialer which resolves via the system DNS resolver,
+        // which is already captured by TUN → circular dependency → "no such host".
+        // Fix: resolve the server domain BEFORE the TUN is active and use the
+        // resolved IP address directly in the outbound config.
+        serverAddress := server.Host
+        if server.Host != "" && net.ParseIP(server.Host) == nil {
+                // Host is a domain — resolve it to IP before TUN captures DNS
+                resolvedIPs, err := net.LookupIP(server.Host)
+                if err != nil {
+                        return "", fmt.Errorf("xray: failed to pre-resolve server host %q: %w", server.Host, err)
+                }
+                // Prefer IPv4
+                for _, ip := range resolvedIPs {
+                        if ipv4 := ip.To4(); ipv4 != nil {
+                                serverAddress = ipv4.String()
+                                x.appendLog("[xray] pre-resolved %s → %s (before TUN capture)", server.Host, serverAddress)
+                                break
+                        }
+                }
+                if serverAddress == server.Host {
+                        // No IPv4 found, use first available
+                        if len(resolvedIPs) > 0 {
+                                serverAddress = resolvedIPs[0].String()
+                                x.appendLog("[xray] pre-resolved %s → %s (IPv6 fallback)", server.Host, serverAddress)
+                        }
+                }
+        }
+
         cfg := map[string]interface{}{
                 "log": map[string]interface{}{
                         "loglevel": "info",
                 },
                 "inbounds": x.buildInbounds(socksPort, httpPort),
                 "outbounds": []interface{}{
-                        x.buildOutbound(xrayProtocol, server),
+                        x.buildOutbound(xrayProtocol, server, serverAddress),
                         map[string]interface{}{
                                 "tag":      "direct",
                                 "protocol": "freedom",
@@ -126,14 +156,15 @@ func (x *XrayHandler) buildInbounds(socksPort, httpPort uint32) []interface{} {
 }
 
 // buildOutbound constructs the xray outbound configuration.
-func (x *XrayHandler) buildOutbound(protocol string, server *engine.ServerConfig) map[string]interface{} {
+// serverAddress overrides server.Host (used when host is pre-resolved to IP).
+func (x *XrayHandler) buildOutbound(protocol string, server *engine.ServerConfig, serverAddress string) map[string]interface{} {
         outbound := map[string]interface{}{
                 "tag":      "proxy",
                 "protocol": protocol,
                 "settings": map[string]interface{}{
                         "vnext": []interface{}{
                                 map[string]interface{}{
-                                        "address": server.Host,
+                                        "address": serverAddress,
                                         "port":    server.Port,
                                         "users": []interface{}{
                                                 map[string]interface{}{

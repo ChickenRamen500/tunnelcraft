@@ -38,18 +38,16 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [fetchStatus]);
 
-  // Simulate speed updates when connected (in real app, from gRPC stream)
+  // Speed updates when connected — read actual bytes from backend status.
+  // No fake random data.
   useEffect(() => {
     if (!isConnected) {
       updateSpeed(0, 0);
       return;
     }
-    const interval = setInterval(() => {
-      const up = Math.random() * 500000 + 100000;
-      const down = Math.random() * 2000000 + 500000;
-      updateSpeed(up, down);
-    }, 1000);
-    return () => clearInterval(interval);
+    // Speed is derived from status.stats which comes from the backend.
+    // Until real traffic counting is implemented, show 0.
+    updateSpeed(0, 0);
   }, [isConnected, updateSpeed]);
 
   const handleToggle = async () => {

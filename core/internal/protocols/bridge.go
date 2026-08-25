@@ -170,19 +170,29 @@ func (s *SingBoxHandler) generateBridgeConfig(server *engine.ServerConfig, bridg
         // Add server endpoint IP to exclude (so xray can reach it directly)
         // This is critical: without this, the TUN would capture xray's outbound traffic
         // causing a routing loop.
-        // NOTE: route_exclude_address only accepts valid CIDR IP prefixes.
-        // If server.Host is a domain, resolve it first. Fall back to a DNS rule.
+        // If server.Host is a domain, resolve it NOW (before TUN is active)
+        // and add the resolved IP to route_exclude_address.
         if server.Host != "" {
                 ip := net.ParseIP(server.Host)
-                if ip != nil {
+                if ip == nil {
+                        // Host is a domain — resolve it before TUN captures DNS
+                        resolvedIPs, err := net.LookupIP(server.Host)
+                        if err == nil {
+                                for _, rip := range resolvedIPs {
+                                        if ipv4 := rip.To4(); ipv4 != nil {
+                                                routeExclude = append(routeExclude, ipv4.String()+"/32")
+                                                break
+                                        }
+                                }
+                        }
+                        // If resolution fails, fall back to DNS rule below
+                } else {
                         if ipv4 := ip.To4(); ipv4 != nil {
                                 routeExclude = append(routeExclude, ipv4.String()+"/32")
                         } else {
                                 routeExclude = append(routeExclude, ip.String()+"/128")
                         }
                 }
-                // If Host is a domain, we cannot add it to route_exclude_address.
-                // Instead, we add a DNS rule to route the server domain via direct.
         }
 
         // Build routing rules

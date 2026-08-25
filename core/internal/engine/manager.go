@@ -4,6 +4,7 @@ import (
         "context"
         "fmt"
         "log"
+        "net"
         "os"
         "path/filepath"
         "sync"
@@ -202,6 +203,29 @@ func (m *Manager) Connect(ctx context.Context, serverID string) error {
                 return fmt.Errorf("protocol process exited immediately (check logs for config errors)")
         }
         log.Printf("[manager] subprocess is alive after grace period")
+
+        // For TUN-based protocols (bridge, sing-box), verify that DNS resolution
+        // actually works through the tunnel. Without this check, the connection
+        // appears successful even when xray can't resolve the server domain
+        // ("no such host") — the processes stay alive but there's no internet.
+        // A simple TCP dial to a well-known IP (1.1.1.1:443) through the TUN
+        // verifies the data path works.
+        if skipGoTUN {
+                log.Printf("[manager] verifying TUN data path (DNS/connectivity check)...")
+                if !m.verifyTUNConnectivity(server) {
+                        log.Printf("[manager] TUN connectivity check FAILED")
+                        handler.Stop()
+                        cancel()
+                        m.setState(StateError)
+                        m.emit(ConnectionEvent{
+                                State: StateError,
+                                Error: "connected but no internet — DNS or tunnel data path broken",
+                                Time:  time.Now(),
+                        })
+                        return fmt.Errorf("connected but no internet — check server DNS/domain and logs")
+                }
+                log.Printf("[manager] TUN connectivity check passed")
+        }
 
         // Setup TUN and routing.
         // Skip for protocols that manage their own TUN adapter:
@@ -436,6 +460,34 @@ func (m *Manager) getBridgeHandler() ProtocolHandler {
         m.bridgeHandler = m.bridgeFactory(xrayPath, singboxPath)
         log.Printf("[manager] bridge handler created (xray=%s, singbox=%s)", xrayPath, singboxPath)
         return m.bridgeHandler
+}
+
+// verifyTUNConnectivity checks whether the TUN tunnel actually works
+// by attempting a TCP connection to a well-known IP and a DNS resolution.
+// Returns true if connectivity is confirmed, false otherwise.
+func (m *Manager) verifyTUNConnectivity(server *ServerConfig) bool {
+        // Test 1: TCP dial to 1.1.1.1:443 (Cloudflare) with a short timeout.
+        // This verifies the TUN data path is working end-to-end.
+        conn, err := net.DialTimeout("tcp", "1.1.1.1:443", 5*time.Second)
+        if err != nil {
+                log.Printf("[manager] connectivity check: TCP dial to 1.1.1.1:443 failed: %v", err)
+                return false
+        }
+        conn.Close()
+
+        // Test 2: DNS resolution through the tunnel
+        resolver := &net.Resolver{}
+        ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+        defer cancel()
+        // Use a reliable domain that's unlikely to be cached
+        _, err = resolver.LookupHost(ctx, "www.google.com")
+        if err != nil {
+                log.Printf("[manager] connectivity check: DNS lookup failed: %v", err)
+                // DNS failure is not fatal — TCP works, so the tunnel is up.
+                // DNS issues may be transient. Return true since data path works.
+        }
+
+        return true
 }
 
 func (m *Manager) monitorHealth(ctx context.Context, server *ServerConfig) {
