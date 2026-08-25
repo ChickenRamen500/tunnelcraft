@@ -1,11 +1,21 @@
+import { useState } from "react";
 import type { Server } from "@/hooks/useApi";
-import { Wifi, Globe, Shield, Zap } from "lucide-react";
+import { Wifi, Globe, Shield, Zap, Activity } from "lucide-react";
+
+interface PingState {
+  latency_ms: number;
+  ok: boolean;
+  error?: string;
+}
 
 interface ServerCardProps {
   server: Server;
   isSelected?: boolean;
   isConnected?: boolean;
   onClick: (server: Server) => void;
+  onPing?: (serverId: string) => void;
+  pingState?: PingState | null;
+  isPinging?: boolean;
 }
 
 const protocolIcons: Record<string, React.ReactNode> = {
@@ -26,8 +36,27 @@ const protocolLabels: Record<string, string> = {
   amneziawg: "AmneziaWG",
 };
 
-export default function ServerCard({ server, isSelected, isConnected, onClick }: ServerCardProps) {
+function formatLatency(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function getLatencyColor(ms: number, ok: boolean): string {
+  if (!ok) return "text-red-400";
+  if (ms < 100) return "text-emerald-400";
+  if (ms < 300) return "text-yellow-400";
+  if (ms < 800) return "text-orange-400";
+  return "text-red-400";
+}
+
+export default function ServerCard({ server, isSelected, isConnected, onClick, onPing, pingState, isPinging }: ServerCardProps) {
   const highlight = isSelected || isConnected;
+
+  const handlePingClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onPing?.(server.id);
+  };
+
   return (
     <button
       onClick={() => onClick(server)}
@@ -51,6 +80,28 @@ export default function ServerCard({ server, isSelected, isConnected, onClick }:
           <span>{server.host}:{server.port}</span>
         </div>
       </div>
+
+      {/* Ping result */}
+      {pingState && !isPinging && (
+        <span className={`text-xs font-mono flex-shrink-0 ${getLatencyColor(pingState.latency_ms, pingState.ok)}`}>
+          {pingState.ok ? formatLatency(pingState.latency_ms) : "timeout"}
+        </span>
+      )}
+
+      {/* Ping button */}
+      <button
+        onClick={handlePingClick}
+        className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0
+          bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)]
+          transition-colors text-[var(--text-muted)] hover:text-emerald-400"
+        title="Ping"
+      >
+        <Activity
+          size={13}
+          className={isPinging ? "animate-pulse text-yellow-400" : ""}
+        />
+      </button>
+
       {isConnected && (
         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
       )}

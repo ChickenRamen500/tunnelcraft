@@ -19,8 +19,9 @@ export default function Dashboard() {
     setConnecting,
   } = useConnectionStore();
 
-  const isConnected = status.state === "CONNECTED";
+  const isConnected = status.state === "CONNECTED" || status.state === "FALLBACK_CONNECTED";
   const isDisconnected = status.state === "DISCONNECTED" || status.state === "ERROR";
+  const isConnecting = status.state === "CONNECTING" || status.state === "DISCONNECTING" || status.state === "RECONNECTING";
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -54,20 +55,23 @@ export default function Dashboard() {
 
   const handleToggle = async () => {
     if (isConnected || isConnecting) {
-      setConnecting(true);
       try {
         await disconnectServer(false);
-      } finally {
-        setConnecting(false);
+        // Immediately fetch status to update UI without waiting for poll
+        fetchStatus();
+      } catch (e) {
+        console.error("Disconnect failed:", e);
+        fetchStatus();
       }
     } else {
       const serverId = activeServer?.id || status.server_id || "";
       if (!serverId) return;
-      setConnecting(true);
       try {
         await connectServer(serverId);
-      } finally {
-        setConnecting(false);
+        fetchStatus();
+      } catch (e) {
+        console.error("Connect failed:", e);
+        fetchStatus();
       }
     }
   };

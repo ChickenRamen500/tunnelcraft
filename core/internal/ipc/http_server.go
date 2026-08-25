@@ -64,10 +64,12 @@ func (h *HTTPServer) Start(addr string) error {
         mux.HandleFunc("/api/servers/import", h.handleImport)
         mux.HandleFunc("/api/subscriptions", h.handleSubscriptions)
         mux.HandleFunc("/api/subscriptions/refresh/", h.handleRefreshSubscription)
+        mux.HandleFunc("/api/subscriptions/delete", h.handleDeleteSubscription)
         mux.HandleFunc("/api/settings", h.handleSettings)
         mux.HandleFunc("/api/logs", h.handleLogs)
         mux.HandleFunc("/api/routing", h.handleRouting)
         mux.HandleFunc("/api/routing/rules", h.handleRoutingRules)
+        mux.HandleFunc("/api/ping", h.handlePing)
 
         // Serve static web UI files from "ui/" subdirectory (if exists)
         uiDir := filepath.Join(filepath.Dir(h.cfg.GetConfigPath()), "ui")
@@ -188,7 +190,7 @@ func (h *HTTPServer) handleStatus(w http.ResponseWriter, req *http.Request) {
         active := h.mgr.ActiveServer()
 
         resp := map[string]interface{}{
-                "state":            state.String(),
+                "state":            strings.ToUpper(state.String()),
                 "server_id":         "",
                 "server_name":       "",
                 "protocol":          "",
@@ -455,6 +457,29 @@ func (h *HTTPServer) handleSubscriptions(w http.ResponseWriter, req *http.Reques
         default:
                 h.jsonErr(w, http.StatusMethodNotAllowed, "GET or POST required")
         }
+}
+
+// GET /api/subscriptions/delete?id=xxx — delete a subscription by ID
+func (h *HTTPServer) handleDeleteSubscription(w http.ResponseWriter, req *http.Request) {
+        if req.Method != http.MethodDelete {
+                h.jsonErr(w, http.StatusMethodNotAllowed, "DELETE required")
+                return
+        }
+
+        id := req.URL.Query().Get("id")
+        if id == "" {
+                h.jsonErr(w, http.StatusBadRequest, "id query parameter is required")
+                return
+        }
+
+        if err := h.cfg.DeleteSubscription(id); err != nil {
+                h.jsonErr(w, http.StatusInternalServerError, err.Error())
+                return
+        }
+
+        h.json(w, http.StatusOK, map[string]interface{}{
+                "status": "ok",
+        })
 }
 
 // POST /api/subscriptions/refresh/{id}
@@ -800,6 +825,53 @@ func (h *HTTPServer) handleRoutingRules(w http.ResponseWriter, req *http.Request
         default:
                 h.jsonErr(w, http.StatusMethodNotAllowed, "GET, POST, PUT, or DELETE required")
         }
+}
+
+// GET /api/ping?id=xxx — TCP ping a single server
+func (h *HTTPServer) handlePing(w http.ResponseWriter, req *http.Request) {
+        if req.Method != http.MethodGet {
+                h.jsonErr(w, http.StatusMethodNotAllowed, "GET required")
+                return
+        }
+
+        serverID := req.URL.Query().Get("id")
+        if serverID == "" {
+                h.jsonErr(w, http.StatusBadRequest, "id query parameter is required")
+                return
+        }
+
+        // Find the server by ID
+        servers := h.cfg.GetServers()
+        var found *config.ServerEntry
+        for i := range servers {
+                if servers[i].ID == serverID {
+                        found = &servers[i]
+                        break
+                }
+        }
+        if found == nil {
+                h.jsonErr(w, http.StatusNotFound, "server not found")
+                return
+        }
+
+        // Perform TCP ping
+        latency := engine.TCPPing(found.Host, int(found.Port), 1)
+
+        if latency < 0 {
+                h.json(w, http.StatusOK, map[string]interface{}{
+                        "id":         serverID,
+                        "latency_ms": -1,
+                        "ok":         false,
+                        "error":      "connection timed out",
+                })
+                return
+        }
+
+        h.json(w, http.StatusOK, map[string]interface{}{
+                "id":         serverID,
+                "latency_ms": latency.Milliseconds(),
+                "ok":         true,
+        })
 }
 
 // isConfFile checks if the content looks like a WireGuard/AmneziaWG .conf file.

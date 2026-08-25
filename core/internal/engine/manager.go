@@ -33,6 +33,7 @@ type Manager struct {
         cancelFunc    context.CancelFunc
         proto         ProtocolHandler // current active protocol handler
         tunnel        TunnelController
+        goTUNActive   bool              // true if Go-level TUN was set up (needs teardown)
         healthChecker *HealthChecker
         protoHandlers map[Protocol]ProtocolHandler
         bridgeHandler ProtocolHandler // lazy-created bridge handler
@@ -203,11 +204,16 @@ func (m *Manager) Connect(ctx context.Context, serverID string) error {
         log.Printf("[manager] subprocess is alive after grace period")
 
         // Setup TUN and routing.
-        // Skip for bridge mode: sing-box creates and manages its own TUN adapter
-        // via wintun.dll internally. The Go-level RoutingManager only handles
-        // protocols that don't bring their own TUN (e.g. plain SOCKS proxy mode).
-        isBridge := handler.Name() == "bridge"
-        if m.tunnel != nil && !isBridge {
+        // Skip for protocols that manage their own TUN adapter:
+        //   - bridge mode: sing-box creates TUN internally
+        //   - sing-box direct: sing-box TUN inbound creates TUN internally
+        //   - wireguard/amneziawg: use their own TUN adapters
+        // The Go-level RoutingManager is only needed for legacy protocols
+        // that expose SOCKS/HTTP without TUN.
+        handlerName := handler.Name()
+        skipGoTUN := handlerName == "bridge" || handlerName == "sing-box" ||
+                handlerName == "wireguard" || handlerName == "hysteria" || handlerName == "amnezia"
+        if m.tunnel != nil && !skipGoTUN {
                 if err := m.tunnel.Setup(socksPort, httpPort, server); err != nil {
                         // TUN setup failed — stop the protocol
                         handler.Stop()
@@ -220,11 +226,12 @@ func (m *Manager) Connect(ctx context.Context, serverID string) error {
                         })
                         return fmt.Errorf("TUN setup failed: %w", err)
                 }
+                m.goTUNActive = true
 
                 // Apply routing rules
                 _ = m.tunnel.ApplyRoutingRules(cfg.Routing.Rules)
-        } else if isBridge {
-                log.Println("[manager] bridge mode: skipping Go-level TUN/routing (sing-box manages TUN)")
+        } else if skipGoTUN {
+                log.Printf("[manager] %s mode: skipping Go-level TUN/routing (protocol manages TUN)", handlerName)
         }
 
         // Connection established
@@ -278,9 +285,10 @@ func (m *Manager) Disconnect(force bool) error {
                 m.proto = nil
         }
 
-        // Teardown TUN
-        if m.tunnel != nil {
+        // Teardown Go-level TUN (only if we set it up)
+        if m.tunnel != nil && m.goTUNActive {
                 m.tunnel.Teardown()
+                m.goTUNActive = false
         }
 
         m.mu.Lock()

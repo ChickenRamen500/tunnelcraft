@@ -64,7 +64,7 @@ func (x *XrayHandler) generateConfig(server *engine.ServerConfig, socksPort, htt
         // Build the config
         cfg := map[string]interface{}{
                 "log": map[string]interface{}{
-                        "loglevel": "warning",
+                        "loglevel": "info",
                 },
                 "inbounds": x.buildInbounds(socksPort, httpPort),
                 "outbounds": []interface{}{

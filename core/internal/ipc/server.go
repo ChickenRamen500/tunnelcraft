@@ -431,7 +431,9 @@ func (ss *subscriptionService) UpdateSubscription(ctx context.Context, req *prot
 
 func (ss *subscriptionService) DeleteSubscription(ctx context.Context, req *protos.DeleteSubscriptionRequest) (*emptypb.Empty, error) {
         _ = ctx
-        // TODO: implement subscription deletion
+        if err := ss.s.cfg.DeleteSubscription(req.SubscriptionId); err != nil {
+                return nil, status.Errorf(codes.Internal, "failed to delete subscription: %v", err)
+        }
         return &emptypb.Empty{}, nil
 }
 

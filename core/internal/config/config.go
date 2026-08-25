@@ -402,3 +402,24 @@ func (m *Manager) GetRouting() RoutingConfig {
         defer m.mu.RUnlock()
         return m.config.Routing
 }
+
+// DeleteSubscription removes a subscription by ID and all associated servers.
+func (m *Manager) DeleteSubscription(id string) error {
+        return m.Update(func(c *Config) {
+                filtered := make([]SubscriptionEntry, 0, len(c.Subscriptions))
+                for _, s := range c.Subscriptions {
+                        if s.ID != id {
+                                filtered = append(filtered, s)
+                        }
+                }
+                c.Subscriptions = filtered
+
+                servers := make([]ServerEntry, 0, len(c.Servers))
+                for _, s := range c.Servers {
+                        if s.SubscriptionID != id {
+                                servers = append(servers, s)
+                        }
+                }
+                c.Servers = servers
+        })
+}

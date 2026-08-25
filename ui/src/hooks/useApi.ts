@@ -152,6 +152,12 @@ export async function refreshSubscription(id: string): Promise<any> {
   return api(`/api/subscriptions/refresh/${id}`, { method: "POST" });
 }
 
+export async function deleteSubscription(id: string): Promise<{ status: string }> {
+  return api(`/api/subscriptions/delete?id=${id}`, {
+    method: "DELETE",
+  });
+}
+
 export async function getSettings(): Promise<Settings> {
   try {
     return await api<Settings>("/api/settings");
@@ -232,6 +238,17 @@ export function formatBytes(bytes: number): string {
   const sizes = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+}
+
+export interface PingResult {
+  id: string;
+  latency_ms: number;
+  ok: boolean;
+  error?: string;
+}
+
+export async function pingServer(id: string): Promise<PingResult> {
+  return api<PingResult>(`/api/ping?id=${id}`);
 }
 
 // Format duration in seconds to HH:MM:SS

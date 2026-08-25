@@ -1,8 +1,14 @@
-import { useEffect, useState, useMemo } from "react";
-import { Search, Star, RefreshCw, Filter, Upload } from "lucide-react";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { Search, Star, RefreshCw, Filter, Upload, Activity } from "lucide-react";
 import { useConnectionStore } from "@/stores/connection";
-import { listServers, importServer, type Server } from "@/hooks/useApi";
+import { listServers, importServer, pingServer, type Server, type PingResult } from "@/hooks/useApi";
 import ServerCard from "@/components/ServerCard";
+
+interface PingState {
+  latency_ms: number;
+  ok: boolean;
+  error?: string;
+}
 
 export default function Servers() {
   const { servers, setServers, status, activeServer, setActiveServer } = useConnectionStore();
@@ -11,6 +17,8 @@ export default function Servers() {
   const [loading, setLoading] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [importContent, setImportContent] = useState("");
+  const [pingResults, setPingResults] = useState<Record<string, PingState>>({});
+  const [pingingIds, setPingingIds] = useState<Set<string>>(new Set());
 
   const fetchServers = async () => {
     setLoading(true);
@@ -27,7 +35,6 @@ export default function Servers() {
   useEffect(() => {
     fetchServers();
   }, []);
-
 
   const handleSelectServer = (server: Server) => {
     setActiveServer(server);
@@ -46,6 +53,69 @@ export default function Servers() {
     }
   };
 
+  const handlePing = useCallback(async (serverId: string) => {
+    setPingingIds((prev) => new Set(prev).add(serverId));
+    try {
+      const result = await pingServer(serverId);
+      setPingResults((prev) => ({
+        ...prev,
+        [serverId]: {
+          latency_ms: result.latency_ms,
+          ok: result.ok,
+          error: result.error,
+        },
+      }));
+    } catch {
+      setPingResults((prev) => ({
+        ...prev,
+        [serverId]: { latency_ms: -1, ok: false, error: "request failed" },
+      }));
+    } finally {
+      setPingingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(serverId);
+        return next;
+      });
+    }
+  }, []);
+
+  const handlePingAll = useCallback(async () => {
+    const allServers = servers.length > 0 ? servers : (await listServers().then((r) => r.servers));
+    if (allServers.length === 0) return;
+
+    // Mark all as pinging
+    const ids = new Set(allServers.map((s) => s.id));
+    setPingingIds(ids);
+
+    // Fire all pings concurrently
+    const promises = allServers.map(async (s) => {
+      try {
+        const result = await pingServer(s.id);
+        setPingResults((prev) => ({
+          ...prev,
+          [s.id]: {
+            latency_ms: result.latency_ms,
+            ok: result.ok,
+            error: result.error,
+          },
+        }));
+      } catch {
+        setPingResults((prev) => ({
+          ...prev,
+          [s.id]: { latency_ms: -1, ok: false, error: "request failed" },
+        }));
+      } finally {
+        setPingingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(s.id);
+          return next;
+        });
+      }
+    });
+
+    await Promise.allSettled(promises);
+  }, [servers]);
+
   // Group servers by protocol
   const grouped = useMemo(() => {
     let filtered = servers;
@@ -58,7 +128,7 @@ export default function Servers() {
           s.protocol.toLowerCase().includes(q)
       );
     }
-    if (filter !== "all") {
+    if (filter !== "all" && filter !== "favorites") {
       filtered = filtered.filter((s) => s.protocol === filter);
     }
     if (filter === "favorites") {
@@ -75,6 +145,7 @@ export default function Servers() {
   }, [servers, search, filter]);
 
   const protocols = Array.from(new Set(servers.map((s) => s.protocol)));
+  const isPingingAll = pingingIds.size > 1;
 
   return (
     <div className="flex flex-col h-full fade-in">
@@ -83,6 +154,14 @@ export default function Servers() {
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold">Серверы</h2>
           <div className="flex items-center gap-2">
+            <button
+              onClick={handlePingAll}
+              disabled={isPingingAll || servers.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs hover:bg-emerald-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Activity size={14} className={isPingingAll ? "animate-pulse" : ""} />
+              Пинг всех
+            </button>
             <button
               onClick={() => setShowImport(!showImport)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-300 text-xs hover:bg-purple-500/20 transition-colors"
@@ -193,6 +272,9 @@ export default function Servers() {
                     isSelected={activeServer?.id === server.id}
                     isConnected={status.state === "CONNECTED" && status.server_id === server.id}
                     onClick={handleSelectServer}
+                    onPing={handlePing}
+                    pingState={pingResults[server.id] || null}
+                    isPinging={pingingIds.has(server.id)}
                   />
                 ))}
               </div>

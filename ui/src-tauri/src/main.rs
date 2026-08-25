@@ -4,6 +4,7 @@
 mod commands;
 mod grpc_client;
 
+use std::io::{Read, Write};
 use std::process::{Child, Command};
 use std::sync::Mutex;
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
@@ -20,9 +21,26 @@ impl DaemonState {
         DaemonState { process: None }
     }
 
+    fn graceful_shutdown_daemon() {
+        // Send HTTP disconnect request so daemon can stop xray/sing-box
+        if let Ok(mut stream) = std::net::TcpStream::connect("127.0.0.1:50052") {
+            let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(2)));
+            let _ = stream.set_write_timeout(Some(std::time::Duration::from_secs(2)));
+            let request = b"POST /api/disconnect?force=true HTTP/1.1\r\nHost: 127.0.0.1:50052\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+            let _ = stream.write_all(request);
+            // Read response (discard)
+            let mut buf = [0u8; 1024];
+            let _ = stream.read(&mut buf);
+        }
+        // Give daemon time to clean up child processes
+        std::thread::sleep(std::time::Duration::from_millis(800));
+    }
+
     fn kill_daemon(&mut self) {
         if let Some(mut child) = self.process.take() {
-            println!("[tauri] killing daemon process (PID: {:?})", child.id());
+            println!("[tauri] shutting down daemon (PID: {:?})", child.id());
+            Self::graceful_shutdown_daemon();
+            // Now kill the daemon process
             let _ = child.kill();
             let _ = child.wait();
         } else {

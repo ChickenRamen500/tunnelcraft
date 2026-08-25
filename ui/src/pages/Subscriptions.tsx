@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus, RefreshCw, Trash2, ExternalLink, CheckCircle, XCircle } from "lucide-react";
-import { listSubscriptions, addSubscription, refreshSubscription, type Subscription } from "@/hooks/useApi";
+import { listSubscriptions, addSubscription, refreshSubscription, deleteSubscription, listServers, type Subscription } from "@/hooks/useApi";
 
 export default function Subscriptions() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -31,6 +31,20 @@ export default function Subscriptions() {
       console.error(e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (sub: Subscription) => {
+    if (!window.confirm(`Удалить подписку «${sub.name || "Без названия"}»?\nВсе серверы из этой подписки будут тоже удалены.`)) {
+      return;
+    }
+    try {
+      await deleteSubscription(sub.id);
+      await fetchSubs();
+      await listServers(); // refresh server list in background
+    } catch (e) {
+      console.error("Failed to delete subscription:", e);
+      alert("Не удалось удалить подписку: " + (e instanceof Error ? e.message : e));
     }
   };
 
@@ -129,6 +143,7 @@ export default function Subscriptions() {
                     <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
                   </button>
                   <button
+                    onClick={() => handleDelete(sub)}
                     className="p-1.5 rounded-md hover:bg-red-500/10 text-[var(--text-muted)] hover:text-red-400 transition-colors"
                     title="Удалить"
                   >
