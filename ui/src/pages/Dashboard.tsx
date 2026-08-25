@@ -12,7 +12,6 @@ export default function Dashboard() {
     speedUp,
     speedDown,
     speedHistory,
-    isConnecting,
     fallbackMode,
     setStatus,
     updateSpeed,
