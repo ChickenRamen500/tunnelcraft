@@ -204,6 +204,11 @@ func (m *Manager) Connect(ctx context.Context, serverID string) error {
         }
         log.Printf("[manager] subprocess is alive after grace period")
 
+        // Determine whether this protocol manages its own TUN adapter.
+        handlerName := handler.Name()
+        skipGoTUN := handlerName == "bridge" || handlerName == "sing-box" ||
+                handlerName == "wireguard" || handlerName == "hysteria" || handlerName == "amnezia"
+
         // For TUN-based protocols (bridge, sing-box), verify that DNS resolution
         // actually works through the tunnel. Without this check, the connection
         // appears successful even when xray can't resolve the server domain
@@ -227,16 +232,8 @@ func (m *Manager) Connect(ctx context.Context, serverID string) error {
                 log.Printf("[manager] TUN connectivity check passed")
         }
 
-        // Setup TUN and routing.
-        // Skip for protocols that manage their own TUN adapter:
-        //   - bridge mode: sing-box creates TUN internally
-        //   - sing-box direct: sing-box TUN inbound creates TUN internally
-        //   - wireguard/amneziawg: use their own TUN adapters
-        // The Go-level RoutingManager is only needed for legacy protocols
-        // that expose SOCKS/HTTP without TUN.
-        handlerName := handler.Name()
-        skipGoTUN := handlerName == "bridge" || handlerName == "sing-box" ||
-                handlerName == "wireguard" || handlerName == "hysteria" || handlerName == "amnezia"
+        // Setup Go-level TUN and routing (only for protocols that don't manage their own TUN).
+        // Protocols like bridge, sing-box, wireguard, hysteria, amnezia handle TUN internally.
         if m.tunnel != nil && !skipGoTUN {
                 if err := m.tunnel.Setup(socksPort, httpPort, server); err != nil {
                         // TUN setup failed — stop the protocol
